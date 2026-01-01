@@ -657,11 +657,11 @@ export const DashboardEmailBuilder: React.FC = () => {
 
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowLoadModal(true)}>
-            <FolderOpen size={16} className="mr-2" />
+            <FolderOpen size={16} className="ml-2" />
             قالب‌ها
           </Button>
-          <Button size="sm" onClick={() => setShowSaveModal(true)} disabled={blocks.length === 0} className="bg-green-600 hover:bg-green-700 border-none">
-            <Save size={16} className="mr-2" />
+          <Button size="sm" onClick={() => setShowSaveModal(true)} disabled={blocks.length === 0} className="bg-blue-600 hover:bg-blue-700 border-none">
+            <Save size={16} className="ml-2" />
             ذخیره
           </Button>
         </div>
@@ -898,7 +898,7 @@ export const DashboardEmailBuilder: React.FC = () => {
                                                 dir="ltr"
                                                 value={selectedBlock.styles.fontSize}
                                                 onChange={(e) => updateBlockStyle(selectedBlock.id, 'fontSize', e.target.value.replace(/[^0-9]/g, ''))}
-                                                className="flex-1 w-full h-8 text-xs text-center border-none focus:ring-0 text-slate-900 font-medium"
+                                                className="flex-1 w-full h-8 text-xs text-center border-none focus:ring-0 text-slate-900 font-medium bg-white"
                                             />
                                             <button 
                                                 onClick={() => updateBlockStyle(selectedBlock.id, 'fontSize', parseInt(selectedBlock.styles.fontSize) + 1)}
@@ -938,7 +938,7 @@ export const DashboardEmailBuilder: React.FC = () => {
                                                 dir="ltr"
                                                 value={selectedBlock.styles.lineHeight}
                                                 onChange={(e) => updateBlockStyle(selectedBlock.id, 'lineHeight', e.target.value)}
-                                                className="flex-1 w-full h-8 text-xs text-center border-none focus:ring-0 text-slate-900 font-medium"
+                                                className="flex-1 w-full h-8 text-xs text-center border-none focus:ring-0 text-slate-900 font-medium bg-white"
                                             />
                                             <button 
                                                 onClick={() => updateBlockStyle(selectedBlock.id, 'lineHeight', (parseFloat(selectedBlock.styles.lineHeight) + 0.1).toFixed(1))}
@@ -1237,7 +1237,7 @@ export const DashboardEmailBuilder: React.FC = () => {
                         <RefreshCw size={16} className="animate-spin" />
                       ) : (
                         <>
-                          <Sparkles size={16} className="mr-2" />
+                          <Sparkles size={16} className="ml-2" />
                           تولید قالب
                         </>
                       )}

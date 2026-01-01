@@ -9,7 +9,7 @@ import {
   MousePointer2, Palette, AlignCenter, AlignRight, AlignLeft, AlignJustify,
   MoveUp, MoveDown, Settings, Globe, Sliders, BoxSelect, Sun, Droplet, Monitor, Grid,
   Maximize, Minimize, Crop, ArrowLeftRight, Square, Circle,
-  Bold, Italic, Underline as UnderlineIcon, Highlighter, Layers
+  Bold, Italic, Underline as UnderlineIcon, Highlighter, Layers, Box
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -33,7 +33,12 @@ interface SavedTemplate {
 
 // --- Helpers ---
 
-const hexToRgba = (hex: string, alpha: number) => {
+const hexToRgba = (hex: string = '#000000', alpha: number) => {
+  // Guard against undefined or short hex codes
+  if (!hex || (hex.length !== 4 && hex.length !== 7)) {
+      return `rgba(0, 0, 0, ${alpha})`;
+  }
+
   let r = 0, g = 0, b = 0;
   if (hex.length === 4) {
     r = parseInt(hex[1] + hex[1], 16);
@@ -47,12 +52,53 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-// --- Custom Fonts Data ---
+// --- Constants & Data ---
+
+const ICON_MAP: Record<string, string | null> = {
+  none: null,
+  arrowLeft: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
+  arrowRight: '<path d="M5 12h14M12 5l7 7-7 7"/>',
+  cart: '<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  play: '<polygon points="5 3 19 12 5 21 5 3"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+  instagram: '<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>',
+  linkedin: '<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>',
+  twitter: '<path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-12.7 12.5 4 1.7 8.3-2.3 9-6.3-3.6 1.1-6.1-3.1-3.6-5.9 4.3 2.1 7.2.1 8-2.3z"/>', // X/Twitter simplified
+  telegram: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  whatsapp: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>'
+};
+
+// Safe default for dropShadow to prevent crashes
+const defaultDropShadow = { enabled: false, color: '#000000', blur: 0, x: 0, y: 0, opacity: 0 };
+
+const BUTTON_PRESETS = [
+  { name: 'ساده آبی', styles: { buttonBackgroundColor: '#2563eb', textColor: '#ffffff', borderRadius: '8px', border: { enabled: false }, buttonGradient: { enabled: false }, dropShadow: { ...defaultDropShadow }, buttonPadding: '12px 32px' } },
+  { name: 'سایه نرم', styles: { buttonBackgroundColor: '#ffffff', textColor: '#2563eb', borderRadius: '12px', border: { enabled: false }, dropShadow: { enabled: true, color: '#2563eb', blur: 15, x: 0, y: 4, opacity: 0.15 }, buttonGradient: { enabled: false }, buttonPadding: '14px 36px' } },
+  { name: 'گرادینت قرصی', styles: { buttonBackgroundColor: '#8b5cf6', textColor: '#ffffff', borderRadius: '9999px', border: { enabled: false }, buttonGradient: { enabled: true, from: '#8b5cf6', to: '#ec4899', direction: 'to right' }, dropShadow: { enabled: true, color: '#8b5cf6', blur: 10, x: 0, y: 4, opacity: 0.3 }, buttonPadding: '12px 40px' } },
+  { name: 'خط دور (Outline)', styles: { buttonBackgroundColor: 'transparent', textColor: '#1e293b', borderRadius: '6px', border: { enabled: true, color: '#cbd5e1', width: 2, style: 'solid' }, buttonGradient: { enabled: false }, dropShadow: { ...defaultDropShadow }, buttonPadding: '10px 30px' } },
+  { name: 'بروتالیسم', styles: { buttonBackgroundColor: '#facc15', textColor: '#000000', borderRadius: '0px', border: { enabled: true, color: '#000000', width: 3, style: 'solid' }, dropShadow: { enabled: true, color: '#000000', blur: 0, x: 4, y: 4, opacity: 1 }, buttonGradient: { enabled: false }, buttonPadding: '14px 32px' } },
+  { name: 'نئون تیره', styles: { buttonBackgroundColor: '#0f172a', textColor: '#4ade80', borderRadius: '4px', border: { enabled: true, color: '#4ade80', width: 1, style: 'solid' }, dropShadow: { enabled: true, color: '#4ade80', blur: 12, x: 0, y: 0, opacity: 0.4 }, buttonGradient: { enabled: false }, buttonPadding: '12px 32px' } },
+  { name: 'شیشه‌ای', styles: { buttonBackgroundColor: '#ffffff', textColor: '#1e293b', borderRadius: '16px', border: { enabled: true, color: '#e2e8f0', width: 1, style: 'solid' }, buttonGradient: { enabled: true, from: '#f8fafc', to: '#e2e8f0', direction: 'to bottom' }, dropShadow: { enabled: true, color: '#94a3b8', blur: 4, x: 0, y: 2, opacity: 0.1 }, buttonPadding: '12px 32px' } },
+  { name: 'مینیمال', styles: { buttonBackgroundColor: '#f1f5f9', textColor: '#64748b', borderRadius: '6px', border: { enabled: false }, buttonGradient: { enabled: false }, dropShadow: { ...defaultDropShadow }, buttonPadding: '10px 24px' } },
+  { name: 'غروب', styles: { buttonBackgroundColor: '#f97316', textColor: '#ffffff', borderRadius: '12px', border: { enabled: false }, buttonGradient: { enabled: true, from: '#f97316', to: '#fbbf24', direction: 'to bottom right' }, dropShadow: { enabled: true, color: '#f97316', blur: 8, x: 0, y: 4, opacity: 0.3 }, buttonPadding: '14px 36px' } },
+  { name: 'سایبر', styles: { buttonBackgroundColor: '#000000', textColor: '#06b6d4', borderRadius: '2px', border: { enabled: true, color: '#06b6d4', width: 1, style: 'solid' }, buttonGradient: { enabled: false }, dropShadow: { enabled: true, color: '#06b6d4', blur: 0, x: -3, y: 3, opacity: 1 }, buttonPadding: '12px 32px' } },
+];
+
 const CUSTOM_FONTS = [
   {
     name: 'Vazirmatn',
     label: 'وزیر متن (پیش‌فرض)',
-    weights: {} // Loaded via Google Fonts
+    weights: {} 
   },
   {
     name: 'Alibaba',
@@ -247,8 +293,28 @@ const defaultBlocks: Record<BlockType, Omit<EmailBlock, 'id'>> = {
   },
   button: {
     type: 'button',
-    content: { text: 'کلیک کنید', link: '#' },
-    styles: { backgroundColor: '#ffffff', buttonColor: '#2563eb', textColor: '#ffffff', align: 'center', padding: '20px', borderRadius: '8px' }
+    content: { 
+      text: 'کلیک کنید', 
+      link: '#', 
+      icon: 'none',
+      iconPosition: 'right'
+    },
+    styles: { 
+      backgroundColor: '#ffffff', // Container bg
+      buttonBackgroundColor: '#2563eb', // Button bg
+      buttonGradient: { enabled: false, from: '#2563eb', to: '#1d4ed8', direction: 'to right' },
+      textColor: '#ffffff', 
+      align: 'center', 
+      padding: '20px', // Container padding
+      buttonPadding: '12px 32px', // Inner padding
+      borderRadius: '8px',
+      width: 'auto', // 'auto' | 'full'
+      border: { enabled: false, color: '#000000', width: 1, style: 'solid' },
+      dropShadow: { ...defaultDropShadow },
+      fontFamily: 'Vazirmatn',
+      fontSize: '16',
+      fontWeight: '700'
+    }
   },
   image: {
     type: 'image',
@@ -348,10 +414,52 @@ const generateHtmlFromBlocks = (blocks: EmailBlock[]) => {
           </div>`;
 
       case 'button':
+        const btnStyle = styles.buttonGradient?.enabled 
+            ? `background-image: linear-gradient(${styles.buttonGradient.direction === 'to right' ? '90deg' : '180deg'}, ${styles.buttonGradient.from}, ${styles.buttonGradient.to});`
+            : `background-color: ${styles.buttonBackgroundColor || styles.buttonColor};`;
+        
+        let btnShadow = '';
+        if (styles.dropShadow?.enabled) {
+            const shadowColor = hexToRgba(styles.dropShadow.color, styles.dropShadow.opacity);
+            btnShadow = `box-shadow: ${styles.dropShadow.x}px ${styles.dropShadow.y}px ${styles.dropShadow.blur}px ${shadowColor};`;
+        }
+
+        let btnBorder = '';
+        if (styles.border?.enabled) {
+            btnBorder = `border: ${styles.border.width}px ${styles.border.style} ${styles.border.color};`;
+        } else {
+            btnBorder = 'border: none;';
+        }
+
+        // SVG Icon generation
+        // Note: For RTL, if position is 'right', we want icon on the right side of the text.
+        // In standard HTML flow, RTL direction means first element is on right.
+        // So for 'right' icon, it should be the FIRST element in DOM (Icon + Text).
+        // For 'left' icon, it should be the LAST element in DOM (Text + Icon).
+        const isRightIcon = content.iconPosition === 'right';
+        const iconSvg = content.icon && ICON_MAP[content.icon] 
+            ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-${isRightIcon ? 'left' : 'right'}: 12px;">${ICON_MAP[content.icon]}</svg>` 
+            : '';
+
         return `
           <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: ${styles.align};">
-            <a href="${content.link}" style="display: inline-block; background-color: ${styles.buttonColor}; color: ${styles.textColor}; padding: 12px 32px; text-decoration: none; border-radius: ${styles.borderRadius}; font-weight: bold; font-family: 'Vazirmatn', sans-serif;">
-              ${content.text}
+            <a href="${content.link}" style="
+                display: inline-block; 
+                width: ${styles.width === 'full' ? '100%' : 'auto'};
+                box-sizing: border-box;
+                text-align: center;
+                text-decoration: none;
+                color: ${styles.textColor};
+                font-family: '${styles.fontFamily}', sans-serif;
+                font-size: ${styles.fontSize}px;
+                font-weight: ${styles.fontWeight};
+                padding: ${styles.buttonPadding || '12px 32px'};
+                border-radius: ${styles.borderRadius};
+                ${btnStyle}
+                ${btnShadow}
+                ${btnBorder}
+            ">
+              ${isRightIcon ? iconSvg + content.text : content.text + iconSvg}
             </a>
           </div>`;
 
@@ -468,6 +576,24 @@ export const DashboardEmailBuilder: React.FC = () => {
     ));
   };
 
+  const applyPreset = (id: string, presetStyles: any) => {
+    // Preserve layout properties (align, padding of container) but overwrite button look
+    setBlocks(blocks.map(b => {
+      if (b.id !== id) return b;
+      return {
+        ...b,
+        styles: {
+          ...b.styles,
+          ...presetStyles,
+          // Preserve container layout
+          backgroundColor: b.styles.backgroundColor,
+          align: b.styles.align,
+          padding: b.styles.padding,
+        }
+      };
+    }));
+  };
+
   const removeBlock = (id: string) => {
     setBlocks(blocks.filter(b => b.id !== id));
     if (selectedBlockId === id) setSelectedBlockId(null);
@@ -503,18 +629,15 @@ export const DashboardEmailBuilder: React.FC = () => {
   const handleSourceTypeChange = (type: string) => {
     if (!selectedBlock) return;
     
-    // Create new styles object to avoid mutation
     const newStyles = { ...selectedBlock.styles };
     const newContent = { ...selectedBlock.content, sourceType: type };
 
     if (type === 'pattern') {
-      // Auto-configure for full-width pattern
       newStyles.width = '100%';
       newStyles.height = '150px';
-      newStyles.padding = '0px'; // Remove padding to fill section
+      newStyles.padding = '0px';
       newStyles.objectFit = 'cover';
     } else if (type === 'url' || type === 'upload') {
-      // Restore logo defaults if values match pattern defaults
       if (newStyles.width === '100%') newStyles.width = '200px';
       if (newStyles.height === '150px') newStyles.height = 'auto';
       if (newStyles.padding === '0px') newStyles.padding = '20px';
@@ -527,61 +650,25 @@ export const DashboardEmailBuilder: React.FC = () => {
     });
   };
 
-  const handleDisplayModeChange = (mode: 'contain' | 'cover' | 'fill') => {
-    if (!selectedBlock) return;
-    const newStyles = { ...selectedBlock.styles, objectFit: mode };
-    
-    // Auto-adjust dimensions for better UX based on mode
-    if (mode === 'fill' || mode === 'cover') { // Stretch or Fill
-        newStyles.width = '100%';
-        if (newStyles.height === 'auto') newStyles.height = '200px';
-        newStyles.padding = '0px';
-    } else { // Fit
-        newStyles.width = '200px';
-        newStyles.height = 'auto';
-        newStyles.padding = '20px';
-    }
-    
-    updateBlock(selectedBlock.id, { styles: newStyles });
-  };
-
   const handleGenerateAi = async () => {
     if (!aiPrompt) return;
     setIsAiLoading(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      // Structured JSON Prompt
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: `Create an email template for: "${aiPrompt}".
-        
         Return a JSON OBJECT with a key "blocks". The value must be an array of objects matching this structure:
         { "type": "header" | "text" | "button" | "image" | "footer", "content": { ... }, "styles": { ... } }
-
-        Content fields per type:
-        - header: { logoUrl, alt, link }
-        - text: { text, link }
-        - button: { text, link }
-        - image: { imageUrl, alt, link }
-        - footer: { text, unsubscribeText, unsubscribeLink }
-
-        Style fields (optional but recommended): backgroundColor, color, align (right/center/left), padding.
-
-        IMPORTANT:
-        - Use Persian language for text.
-        - Ensure "text" blocks are aligned "right" (RTL).
-        
         Return ONLY valid JSON.`,
         config: { responseMimeType: "application/json" }
       });
 
       const json = JSON.parse(response.text || '{}');
       if (json.blocks && Array.isArray(json.blocks)) {
-        // Add IDs to blocks
         const newBlocks = json.blocks.map((b: any) => ({
           ...b,
           id: Date.now().toString() + Math.random().toString(),
-          // Merge with default styles to ensure nothing breaks
           styles: { ...defaultBlocks[b.type as BlockType]?.styles, ...b.styles }
         }));
         setBlocks(newBlocks);
@@ -615,14 +702,10 @@ export const DashboardEmailBuilder: React.FC = () => {
   };
 
   const selectedBlock = blocks.find(b => b.id === selectedBlockId);
-
-  // --- HTML for Code View ---
   const rawHtml = generateHtmlFromBlocks(blocks);
 
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
-      
-      {/* Inject Custom Fonts for Preview (Design View) */}
       <style>{generateFontCss()}</style>
 
       {/* --- Top Bar --- */}
@@ -690,6 +773,369 @@ export const DashboardEmailBuilder: React.FC = () => {
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                    
+                   {/* BUTTON SETTINGS */}
+                   {selectedBlock.type === 'button' && (
+                     <div className="space-y-6">
+                        {/* 1. Presets */}
+                        <div className="space-y-2">
+                           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">استایل‌های آماده</div>
+                           <div className="grid grid-cols-2 gap-2 p-1">
+                              {BUTTON_PRESETS.map((preset, idx) => (
+                                 <button
+                                   key={idx}
+                                   onClick={() => applyPreset(selectedBlock.id, preset.styles)}
+                                   className="text-xs py-2 px-3 rounded-lg border border-slate-200 bg-white hover:border-blue-300 hover:text-blue-600 hover:shadow-md transition-all text-center text-slate-700 font-medium truncate"
+                                 >
+                                    {preset.name}
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
+
+                        {/* 2. Content */}
+                        <div className="space-y-3 pt-4 border-t border-slate-100">
+                           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">محتوا</div>
+                           
+                           <div>
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">متن دکمه</label>
+                              <input 
+                                type="text" 
+                                value={selectedBlock.content.text}
+                                onChange={(e) => updateBlockContent(selectedBlock.id, 'text', e.target.value)}
+                                className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-1 focus:ring-blue-500 text-slate-900"
+                              />
+                           </div>
+                           
+                           <div>
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">لینک مقصد</label>
+                              <input 
+                                type="text" dir="ltr"
+                                value={selectedBlock.content.link}
+                                onChange={(e) => updateBlockContent(selectedBlock.id, 'link', e.target.value)}
+                                className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-1 focus:ring-blue-500 text-left text-slate-900"
+                              />
+                           </div>
+
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">آیکون دکمه</label>
+                              
+                              {/* Visual Icon Grid */}
+                              <div className="grid grid-cols-5 gap-2">
+                                <button
+                                    onClick={() => updateBlockContent(selectedBlock.id, 'icon', 'none')}
+                                    className={`aspect-square rounded-lg border flex items-center justify-center transition-all ${selectedBlock.content.icon === 'none' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-400 hover:border-blue-200'}`}
+                                    title="بدون آیکون"
+                                >
+                                    <X size={14} />
+                                </button>
+                                {Object.keys(ICON_MAP).filter(k => k !== 'none').map(k => (
+                                    <button
+                                        key={k}
+                                        onClick={() => updateBlockContent(selectedBlock.id, 'icon', k)}
+                                        className={`aspect-square rounded-lg border flex items-center justify-center transition-all ${selectedBlock.content.icon === k ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200'}`}
+                                        title={k}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: ICON_MAP[k] || '' }} />
+                                    </button>
+                                ))}
+                              </div>
+
+                              {selectedBlock.content.icon !== 'none' && (
+                                <div className="mt-2">
+                                   <label className="text-[10px] font-bold text-slate-600 block mb-1">موقعیت آیکون</label>
+                                   <div className="flex bg-slate-100 p-1 rounded-lg">
+                                      <button 
+                                        onClick={() => updateBlockContent(selectedBlock.id, 'iconPosition', 'right')}
+                                        className={`flex-1 py-1 text-[10px] rounded transition-all ${selectedBlock.content.iconPosition === 'right' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                                      >راست</button>
+                                      <button 
+                                        onClick={() => updateBlockContent(selectedBlock.id, 'iconPosition', 'left')}
+                                        className={`flex-1 py-1 text-[10px] rounded transition-all ${selectedBlock.content.iconPosition === 'left' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                                      >چپ</button>
+                                   </div>
+                                </div>
+                              )}
+                           </div>
+                        </div>
+
+                        {/* 3. Typography */}
+                        <div className="space-y-3 pt-4 border-t border-slate-100">
+                           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">تایپوگرافی</div>
+                           
+                           <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-600 block mb-1">فونت</label>
+                                 <select 
+                                   value={selectedBlock.styles.fontFamily}
+                                   onChange={(e) => updateBlockStyle(selectedBlock.id, 'fontFamily', e.target.value)}
+                                   className="w-full p-1.5 text-xs border border-slate-200 rounded bg-white text-slate-900"
+                                 >
+                                    {CUSTOM_FONTS.map(font => (
+                                      <option key={font.name} value={font.name}>{font.label}</option>
+                                    ))}
+                                 </select>
+                              </div>
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-600 block mb-1">سایز (px)</label>
+                                 <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden relative">
+                                    <button 
+                                        onClick={() => updateBlockStyle(selectedBlock.id, 'fontSize', Math.max(8, parseInt(selectedBlock.styles.fontSize) - 1))}
+                                        className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 text-slate-500 transition-colors border-l border-slate-100"
+                                    >
+                                        <Minus size={14} />
+                                    </button>
+                                    <input 
+                                        type="text" 
+                                        dir="ltr"
+                                        value={selectedBlock.styles.fontSize}
+                                        onChange={(e) => updateBlockStyle(selectedBlock.id, 'fontSize', e.target.value.replace(/[^0-9]/g, ''))}
+                                        className="flex-1 w-full h-8 text-xs text-center border-none focus:ring-0 text-slate-900 font-medium bg-white"
+                                    />
+                                    <button 
+                                        onClick={() => updateBlockStyle(selectedBlock.id, 'fontSize', parseInt(selectedBlock.styles.fontSize) + 1)}
+                                        className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 text-slate-500 transition-colors border-r border-slate-100"
+                                    >
+                                        <Plus size={14} />
+                                    </button>
+                                 </div>
+                              </div>
+                           </div>
+
+                           <div>
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">وزن</label>
+                              <select 
+                                value={selectedBlock.styles.fontWeight}
+                                onChange={(e) => updateBlockStyle(selectedBlock.id, 'fontWeight', e.target.value)}
+                                className="w-full p-1.5 text-xs border border-slate-200 rounded bg-white text-slate-900"
+                              >
+                                 <option value="300">نازک (Light)</option>
+                                 <option value="400">عادی (Normal)</option>
+                                 <option value="700">ضخیم (Bold)</option>
+                                 <option value="900">خیلی ضخیم (Heavy)</option>
+                              </select>
+                           </div>
+                        </div>
+
+                        {/* 4. Appearance */}
+                        <div className="space-y-4 pt-4 border-t border-slate-100">
+                           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ظاهر دکمه</div>
+
+                           {/* Custom Tabs for Style Type */}
+                           <div className="bg-slate-100 p-1 rounded-lg flex mb-4">
+                              <button 
+                                onClick={() => updateBlockNestedStyle(selectedBlock.id, 'buttonGradient', 'enabled', false)}
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!selectedBlock.styles.buttonGradient?.enabled ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                              >
+                                تک رنگ
+                              </button>
+                              <button 
+                                onClick={() => updateBlockNestedStyle(selectedBlock.id, 'buttonGradient', 'enabled', true)}
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${selectedBlock.styles.buttonGradient?.enabled ? 'bg-white shadow-sm text-purple-600' : 'text-slate-500'}`}
+                              >
+                                گرادینت
+                              </button>
+                           </div>
+
+                           <div className="space-y-3">
+                              {/* Color/Gradient Controls */}
+                              {!selectedBlock.styles.buttonGradient?.enabled ? (
+                                 <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <span className="text-[10px] font-bold text-slate-600">رنگ پس‌زمینه</span>
+                                    <div className="flex items-center gap-2">
+                                       <div className="w-8 h-8 rounded-lg border border-slate-200 overflow-hidden shrink-0 relative">
+                                          <input 
+                                            type="color" 
+                                            value={selectedBlock.styles.buttonBackgroundColor || '#2563eb'}
+                                            onChange={(e) => updateBlockStyle(selectedBlock.id, 'buttonBackgroundColor', e.target.value)}
+                                            className="absolute -top-2 -left-2 w-16 h-16 cursor-pointer p-0 border-none"
+                                          />
+                                       </div>
+                                       <span className="text-[10px] font-mono text-slate-400" dir="ltr">{selectedBlock.styles.buttonBackgroundColor}</span>
+                                    </div>
+                                 </div>
+                              ) : (
+                                 <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                       <span className="text-[10px] font-bold text-purple-800">شروع و پایان</span>
+                                       <select 
+                                          value={selectedBlock.styles.buttonGradient?.direction || 'to right'}
+                                          onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'buttonGradient', 'direction', e.target.value)}
+                                          className="text-[10px] py-1 px-2 rounded border border-purple-200 bg-white text-slate-700"
+                                       >
+                                          <option value="to right">افقی</option>
+                                          <option value="to bottom">عمودی</option>
+                                          <option value="to bottom right">مورب</option>
+                                       </select>
+                                    </div>
+                                    <div className="flex gap-2">
+                                       <div className="flex-1 flex items-center gap-2 bg-white p-2 rounded-lg border border-purple-100">
+                                          <input 
+                                            type="color" 
+                                            value={selectedBlock.styles.buttonGradient?.from || '#2563eb'}
+                                            onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'buttonGradient', 'from', e.target.value)}
+                                            className="w-6 h-6 rounded cursor-pointer border-none p-0"
+                                          />
+                                          <span className="text-[10px] text-slate-400">از</span>
+                                       </div>
+                                       <div className="flex-1 flex items-center gap-2 bg-white p-2 rounded-lg border border-purple-100">
+                                          <input 
+                                            type="color" 
+                                            value={selectedBlock.styles.buttonGradient?.to || '#1d4ed8'}
+                                            onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'buttonGradient', 'to', e.target.value)}
+                                            className="w-6 h-6 rounded cursor-pointer border-none p-0"
+                                          />
+                                          <span className="text-[10px] text-slate-400">به</span>
+                                       </div>
+                                    </div>
+                                 </div>
+                              )}
+
+                              {/* Text Color */}
+                              <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                 <span className="text-[10px] font-bold text-slate-600">رنگ متن و آیکون</span>
+                                 <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg border border-slate-200 overflow-hidden shrink-0 relative">
+                                       <input 
+                                         type="color" 
+                                         value={selectedBlock.styles.textColor || '#ffffff'}
+                                         onChange={(e) => updateBlockStyle(selectedBlock.id, 'textColor', e.target.value)}
+                                         className="absolute -top-2 -left-2 w-16 h-16 cursor-pointer p-0 border-none"
+                                       />
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-400" dir="ltr">{selectedBlock.styles.textColor}</span>
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* Border Radius */}
+                           <div className="pt-2">
+                              <div className="flex justify-between mb-1">
+                                 <label className="text-[10px] font-bold text-slate-600">گردی گوشه</label>
+                                 <span className="text-[10px] text-slate-400">{selectedBlock.styles.borderRadius}</span>
+                              </div>
+                              <input 
+                                type="range" min="0" max="50" 
+                                value={parseInt(selectedBlock.styles.borderRadius) || 0}
+                                onChange={(e) => updateBlockStyle(selectedBlock.id, 'borderRadius', `${e.target.value}px`)}
+                                className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                              />
+                           </div>
+
+                           {/* Border Control */}
+                           <div className="pt-2 border-t border-slate-100">
+                              <div className="flex items-center justify-between mb-2">
+                                 <div className="text-[10px] font-bold text-slate-600">حاشیه (Border)</div>
+                                 <label className="relative inline-flex items-center cursor-pointer">
+                                   <input 
+                                     type="checkbox" 
+                                     checked={selectedBlock.styles.border?.enabled || false}
+                                     onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'border', 'enabled', e.target.checked)}
+                                     className="sr-only peer"
+                                   />
+                                   <div className="w-7 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                 </label>
+                              </div>
+                              {selectedBlock.styles.border?.enabled && (
+                                 <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                    <input 
+                                      type="color" 
+                                      value={selectedBlock.styles.border?.color || '#000000'}
+                                      onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'border', 'color', e.target.value)}
+                                      className="w-6 h-6 rounded cursor-pointer border-none p-0 bg-transparent"
+                                    />
+                                    <input 
+                                      type="number" min="1" max="10"
+                                      value={selectedBlock.styles.border?.width || 1}
+                                      onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'border', 'width', parseInt(e.target.value))}
+                                      className="w-12 text-xs p-1 rounded border border-slate-200 text-center bg-white text-slate-900"
+                                    />
+                                    <select 
+                                      value={selectedBlock.styles.border?.style || 'solid'}
+                                      onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'border', 'style', e.target.value)}
+                                      className="flex-1 text-xs p-1 rounded border border-slate-200 bg-white text-slate-900"
+                                    >
+                                       <option value="solid">Solid</option>
+                                       <option value="dashed">Dashed</option>
+                                       <option value="dotted">Dotted</option>
+                                    </select>
+                                 </div>
+                              )}
+                           </div>
+
+                           {/* Shadow Control */}
+                           <div className="pt-2 border-t border-slate-100">
+                              <div className="flex items-center justify-between mb-2">
+                                 <div className="text-[10px] font-bold text-slate-600">سایه دکمه</div>
+                                 <label className="relative inline-flex items-center cursor-pointer">
+                                   <input 
+                                     type="checkbox" 
+                                     checked={selectedBlock.styles.dropShadow?.enabled || false}
+                                     onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'enabled', e.target.checked)}
+                                     className="sr-only peer"
+                                   />
+                                   <div className="w-7 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                 </label>
+                              </div>
+                              {selectedBlock.styles.dropShadow?.enabled && (
+                                 <div className="bg-slate-50 p-3 rounded-xl space-y-3 border border-slate-200">
+                                    <div className="flex items-center gap-2">
+                                       <input 
+                                         type="color" 
+                                         value={selectedBlock.styles.dropShadow?.color || '#000000'}
+                                         onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'color', e.target.value)}
+                                         className="w-6 h-6 rounded cursor-pointer border-none p-0 bg-transparent"
+                                       />
+                                       <div className="flex-1">
+                                          <label className="text-[9px] text-slate-500 block mb-1">Blur</label>
+                                          <input 
+                                            type="range" min="0" max="20" 
+                                            value={selectedBlock.styles.dropShadow?.blur || 0}
+                                            onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'blur', e.target.value)}
+                                            className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600"
+                                          />
+                                       </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                       <div>
+                                          <label className="text-[9px] text-slate-500 block mb-1">X Offset</label>
+                                          <input type="number" value={selectedBlock.styles.dropShadow?.x || 0} onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'x', e.target.value)} className="w-full text-xs p-1 border border-slate-200 rounded bg-white text-center text-slate-900" />
+                                       </div>
+                                       <div>
+                                          <label className="text-[9px] text-slate-500 block mb-1">Y Offset</label>
+                                          <input type="number" value={selectedBlock.styles.dropShadow?.y || 0} onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'y', e.target.value)} className="w-full text-xs p-1 border border-slate-200 rounded bg-white text-center text-slate-900" />
+                                       </div>
+                                    </div>
+                                 </div>
+                              )}
+                           </div>
+                        </div>
+
+                        {/* 5. Placement */}
+                        <div className="space-y-2 pt-4 border-t border-slate-100">
+                           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">جایگذاری</div>
+                           <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-600 block mb-1">عرض دکمه</label>
+                                 <div className="flex bg-slate-100 p-1 rounded-lg">
+                                    <button onClick={() => updateBlockStyle(selectedBlock.id, 'width', 'auto')} className={`flex-1 py-1 text-[10px] rounded transition-all ${selectedBlock.styles.width !== 'full' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>خودکار</button>
+                                    <button onClick={() => updateBlockStyle(selectedBlock.id, 'width', 'full')} className={`flex-1 py-1 text-[10px] rounded transition-all ${selectedBlock.styles.width === 'full' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>تمام عرض</button>
+                                 </div>
+                              </div>
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-600 block mb-1">چیدمان</label>
+                                 <div className="flex bg-slate-100 p-1 rounded-lg">
+                                    {['right', 'center', 'left'].map(align => (
+                                       <button key={align} onClick={() => updateBlockStyle(selectedBlock.id, 'align', align)} className={`flex-1 py-1 rounded flex items-center justify-center transition-all ${selectedBlock.styles.align === align ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}>
+                                          {align === 'right' ? <AlignRight size={14} /> : align === 'center' ? <AlignCenter size={14} /> : <AlignLeft size={14} />}
+                                       </button>
+                                    ))}
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+                   )}
+
                    {/* HEADER SPECIFIC SETTINGS */}
                    {selectedBlock.type === 'header' && (
                      <>
@@ -848,8 +1294,8 @@ export const DashboardEmailBuilder: React.FC = () => {
                    {/* END HEADER SETTINGS */}
 
 
-                   {/* COMMON CONTENT FIELDS (Non-Header) */}
-                   {selectedBlock.type !== 'header' && (
+                   {/* COMMON CONTENT FIELDS (Non-Header & Non-Button) */}
+                   {selectedBlock.type !== 'header' && selectedBlock.type !== 'button' && (
                      <div className="space-y-4">
                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">محتوا</div>
                         
@@ -1111,20 +1557,6 @@ export const DashboardEmailBuilder: React.FC = () => {
                           </>
                         )}
 
-                        {selectedBlock.type === 'button' && (
-                          <>
-                             <div>
-                               <label className="text-xs font-bold text-slate-700 mb-1 block">متن دکمه</label>
-                               <input 
-                                 type="text" 
-                                 value={selectedBlock.content.text}
-                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'text', e.target.value)}
-                                 className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-slate-900"
-                               />
-                             </div>
-                          </>
-                        )}
-
                         {/* General Link Field for All Non-Header Blocks */}
                         <div>
                            <label className="text-xs font-bold text-slate-700 mb-1 block">
@@ -1143,11 +1575,11 @@ export const DashboardEmailBuilder: React.FC = () => {
 
                    {/* COMMON STYLE FIELDS */}
                    <div className="space-y-4 pt-4 border-t border-slate-100">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ظاهر</div>
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ظاهر کلی</div>
                       
                       <div className="grid grid-cols-2 gap-2">
                          <div>
-                            <label className="text-xs font-bold text-slate-700 mb-1 block">پس‌زمینه</label>
+                            <label className="text-xs font-bold text-slate-700 mb-1 block">پس‌زمینه بخش</label>
                             <div className="flex items-center gap-2 border border-slate-200 rounded-lg p-1 bg-slate-50">
                                <input 
                                  type="color" 
@@ -1173,7 +1605,7 @@ export const DashboardEmailBuilder: React.FC = () => {
                          )}
                       </div>
 
-                      {selectedBlock.styles.align && (
+                      {selectedBlock.styles.align && selectedBlock.type !== 'button' && (
                         <div>
                            <label className="text-xs font-bold text-slate-700 mb-1 block">چیدمان</label>
                            <div className="flex bg-slate-100 p-1 rounded-lg">

@@ -1,412 +1,1074 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Code, Eye, Copy, RefreshCw, PenTool, Mail, Save, FolderOpen, Trash2, X, Image as ImageIcon, Link as LinkIcon, Check, Upload } from 'lucide-react';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import { 
+  Sparkles, Code, Eye, Copy, RefreshCw, PenTool, Mail, Save, 
+  FolderOpen, Trash2, X, Image as ImageIcon, Link as LinkIcon, 
+  Check, Upload, GripVertical, Plus, Type, LayoutTemplate, 
+  MousePointer2, Palette, AlignCenter, AlignRight, AlignLeft, 
+  MoveUp, MoveDown, Settings, Globe, Sliders, BoxSelect, Sun, Droplet, Monitor, Grid,
+  Maximize, Minimize, Crop, ArrowLeftRight, Square, Circle
+} from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+
+// --- Types ---
+
+type BlockType = 'header' | 'text' | 'button' | 'image' | 'footer' | 'spacer';
+
+interface EmailBlock {
+  id: string;
+  type: BlockType;
+  content: any;
+  styles: any;
+}
 
 interface SavedTemplate {
   id: string;
   name: string;
-  content: string;
+  blocks: EmailBlock[];
   date: string;
 }
 
-interface DetectedImage {
-  index: number;
-  src: string;
-  alt: string;
-}
+// --- Helpers ---
+
+const hexToRgba = (hex: string, alpha: number) => {
+  let r = 0, g = 0, b = 0;
+  if (hex.length === 4) {
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    r = parseInt(hex.slice(1, 3), 16);
+    g = parseInt(hex.slice(3, 5), 16);
+    b = parseInt(hex.slice(5, 7), 16);
+  }
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+// --- Patterns (CSS Based) ---
+const PATTERNS = [
+  { 
+    id: 'none', 
+    name: 'ساده', 
+    preview: { background: '#f8fafc' }, 
+    css: 'background-color: #f8fafc;' 
+  },
+  { 
+    id: 'grid', 
+    name: 'گرید', 
+    preview: { 
+      backgroundColor: '#ffffff', 
+      backgroundImage: 'linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px)', 
+      backgroundSize: '20px 20px' 
+    },
+    css: 'background-color: #ffffff; background-image: linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px); background-size: 20px 20px;'
+  },
+  { 
+    id: 'dots', 
+    name: 'نقطه‌ها', 
+    preview: { 
+      backgroundColor: '#ffffff', 
+      backgroundImage: 'radial-gradient(#cbd5e1 1.5px, transparent 1.5px)', 
+      backgroundSize: '12px 12px' 
+    },
+    css: 'background-color: #ffffff; background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px); background-size: 12px 12px;'
+  },
+  { 
+    id: 'diagonal', 
+    name: 'مورب', 
+    preview: { 
+      backgroundColor: '#ffffff', 
+      backgroundImage: 'repeating-linear-gradient(45deg, #f1f5f9 0px, #f1f5f9 10px, #ffffff 10px, #ffffff 20px)' 
+    },
+    css: 'background-color: #ffffff; background-image: repeating-linear-gradient(45deg, #f1f5f9 0px, #f1f5f9 10px, #ffffff 10px, #ffffff 20px);'
+  },
+  { 
+    id: 'checker', 
+    name: 'شطرنجی', 
+    preview: { 
+        backgroundColor: '#ffffff',
+        backgroundImage: 'conic-gradient(#f1f5f9 90deg, transparent 90deg 180deg, #f1f5f9 180deg 270deg, transparent 270deg)',
+        backgroundSize: '20px 20px'
+    },
+    css: 'background-color: #ffffff; background-image: conic-gradient(#f1f5f9 90deg, transparent 90deg 180deg, #f1f5f9 180deg 270deg, transparent 270deg); background-size: 20px 20px;'
+  }
+];
+
+// --- Default Props for Blocks ---
+
+const defaultBlocks: Record<BlockType, Omit<EmailBlock, 'id'>> = {
+  header: {
+    type: 'header',
+    content: { 
+      logoUrl: 'https://via.placeholder.com/150x50?text=LOGO', 
+      patternId: 'none',
+      alt: 'Logo', 
+      link: '#',
+      sourceType: 'url', // 'url' | 'upload' | 'pattern'
+    },
+    styles: { 
+      backgroundColor: '#ffffff', 
+      padding: '20px', 
+      align: 'center',
+      objectFit: 'contain', 
+      width: '200px',
+      height: 'auto',
+      filter: {
+        brightness: 100,
+        contrast: 100,
+        saturate: 100,
+      },
+      dropShadow: {
+        enabled: false,
+        color: '#000000',
+        blur: 5,
+        x: 0,
+        y: 4,
+        opacity: 0.3
+      }
+    }
+  },
+  text: {
+    type: 'text',
+    content: { title: 'عنوان اصلی', body: 'لورم ایپسوم متن ساختگی با تولید سادگی نامفهوم از صنعت چاپ و با استفاده از طراحان گرافیک است.', link: '' },
+    styles: { backgroundColor: '#ffffff', color: '#1e293b', align: 'right', padding: '24px' }
+  },
+  button: {
+    type: 'button',
+    content: { text: 'کلیک کنید', link: '#' },
+    styles: { backgroundColor: '#ffffff', buttonColor: '#2563eb', textColor: '#ffffff', align: 'center', padding: '20px', borderRadius: '8px' }
+  },
+  image: {
+    type: 'image',
+    content: { imageUrl: 'https://via.placeholder.com/600x200', alt: 'Image', link: '#' },
+    styles: { padding: '20px', backgroundColor: '#ffffff' }
+  },
+  footer: {
+    type: 'footer',
+    content: { text: '© ۱۴۰۳ تمامی حقوق محفوظ است.', unsubscribeText: 'لغو اشتراک', unsubscribeLink: '#', link: '' },
+    styles: { backgroundColor: '#f1f5f9', color: '#64748b', padding: '32px' }
+  },
+  spacer: {
+    type: 'spacer',
+    content: { link: '' },
+    styles: { height: '32px', backgroundColor: 'transparent' }
+  }
+};
+
+// --- HTML Generator Helper ---
+
+const generateHtmlFromBlocks = (blocks: EmailBlock[]) => {
+  const bodyContent = blocks.map(block => {
+    const { type, content, styles } = block;
+    
+    switch (type) {
+      case 'header':
+        // Build Filter String
+        let filterString = `brightness(${styles.filter?.brightness || 100}%) contrast(${styles.filter?.contrast || 100}%) saturate(${styles.filter?.saturate || 100}%)`;
+        if (styles.dropShadow?.enabled) {
+          const shadowColor = hexToRgba(styles.dropShadow.color, styles.dropShadow.opacity ?? 1);
+          filterString += ` drop-shadow(${styles.dropShadow.x}px ${styles.dropShadow.y}px ${styles.dropShadow.blur}px ${shadowColor})`;
+        }
+
+        // Handle Pattern vs Image
+        const headerInner = content.sourceType === 'pattern' ? `
+           <div style="
+             width: ${styles.width || '100%'}; 
+             height: ${styles.height === 'auto' ? '150px' : styles.height}; 
+             display: inline-block;
+             border-radius: 8px;
+             ${PATTERNS.find(p => p.id === content.patternId)?.css || ''}
+             filter: ${filterString};
+             -webkit-filter: ${filterString};
+           "></div>` : `
+           <img src="${content.logoUrl}" alt="${content.alt}" 
+             style="
+               width: ${styles.width || '200px'}; 
+               height: ${styles.height || 'auto'}; 
+               object-fit: ${styles.objectFit || 'contain'};
+               display: inline-block; 
+               border: 0;
+               filter: ${filterString};
+               -webkit-filter: ${filterString};
+             " 
+           />`;
+
+        // Always wrap header in link if provided
+        const headerContent = content.link ? `<a href="${content.link}" target="_blank" style="text-decoration: none; display: inline-block; width: ${styles.width === '100%' ? '100%' : 'auto'};">${headerInner}</a>` : headerInner;
+
+        return `
+          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: ${styles.align};">
+            ${headerContent}
+          </div>`;
+
+      case 'text':
+        const textInner = `
+          ${content.title ? `<h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 24px; font-weight: bold; font-family: 'Vazirmatn', sans-serif;">${content.title}</h2>` : ''}
+          <p style="margin: 0; color: ${styles.color}; font-size: 16px; line-height: 1.6; font-family: 'Vazirmatn', sans-serif;">${content.body}</p>
+        `;
+        return `
+          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: ${styles.align}; direction: rtl;">
+            ${content.link ? `<a href="${content.link}" style="text-decoration: none; display: block; color: inherit;">${textInner}</a>` : textInner}
+          </div>`;
+
+      case 'button':
+        return `
+          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: ${styles.align};">
+            <a href="${content.link}" style="display: inline-block; background-color: ${styles.buttonColor}; color: ${styles.textColor}; padding: 12px 32px; text-decoration: none; border-radius: ${styles.borderRadius}; font-weight: bold; font-family: 'Vazirmatn', sans-serif;">
+              ${content.text}
+            </a>
+          </div>`;
+
+      case 'image':
+        return `
+          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: center;">
+            <a href="${content.link}" target="_blank" style="display: block;">
+              <img src="${content.imageUrl}" alt="${content.alt}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px;" />
+            </a>
+          </div>`;
+
+      case 'footer':
+        const footerText = `<p style="margin: 0 0 12px 0; color: ${styles.color}; font-size: 14px; font-family: 'Vazirmatn', sans-serif;">${content.text}</p>`;
+        return `
+          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: center; direction: rtl;">
+            ${content.link ? `<a href="${content.link}" style="text-decoration: none; display: block; color: inherit;">${footerText}</a>` : footerText}
+            <a href="${content.unsubscribeLink}" style="color: ${styles.color}; text-decoration: underline; font-size: 12px; font-family: 'Vazirmatn', sans-serif;">${content.unsubscribeText}</a>
+          </div>`;
+
+      case 'spacer':
+        const spacerInner = `<div style="height: ${styles.height}; background-color: ${styles.backgroundColor};"></div>`;
+        return content.link ? `<a href="${content.link}" style="display: block; text-decoration: none;">${spacerInner}</a>` : spacerInner;
+
+      default:
+        return '';
+    }
+  }).join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Vazirmatn', sans-serif; }
+  * { font-family: 'Vazirmatn', sans-serif !important; }
+  .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; overflow: hidden; }
+  a { text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="email-container">
+    ${bodyContent}
+  </div>
+</body>
+</html>`;
+};
+
 
 export const DashboardEmailBuilder: React.FC = () => {
-  const [prompt, setPrompt] = useState('');
-  const [htmlContent, setHtmlContent] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
-  
-  // Image Management State
-  const [detectedImages, setDetectedImages] = useState<DetectedImage[]>([]);
-  
-  // Save/Load State
-  const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
+  // --- State ---
+  const [blocks, setBlocks] = useState<EmailBlock[]>([]);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'design' | 'code'>('design');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState('');
+  const [templateName, setTemplateName] = useState('');
+  const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
 
+  // Drag and Drop State
+  const dragItem = useRef<BlockType | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Effects ---
   useEffect(() => {
     const saved = localStorage.getItem('peiksa_email_templates');
-    if (saved) {
-      setSavedTemplates(JSON.parse(saved));
-    }
+    if (saved) setSavedTemplates(JSON.parse(saved));
   }, []);
 
-  // Detect images whenever HTML content changes
-  useEffect(() => {
-    if (!htmlContent) {
-      setDetectedImages([]);
-      return;
-    }
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlContent, 'text/html');
-    const imgs = doc.getElementsByTagName('img');
-    const imagesList: DetectedImage[] = [];
-    
-    for (let i = 0; i < imgs.length; i++) {
-      imagesList.push({
-        index: i,
-        src: imgs[i].src,
-        alt: imgs[i].alt || `Image ${i + 1}`
-      });
-    }
-    setDetectedImages(imagesList);
-  }, [htmlContent]);
+  // --- Handlers ---
 
-  const saveToLocalStorage = (templates: SavedTemplate[]) => {
-    localStorage.setItem('peiksa_email_templates', JSON.stringify(templates));
-    setSavedTemplates(templates);
-  };
-
-  const handleSaveTemplate = () => {
-    if (!newTemplateName || !htmlContent) return;
-    
-    const newTemplate: SavedTemplate = {
-      id: Date.now().toString(),
-      name: newTemplateName,
-      content: htmlContent,
-      date: new Date().toLocaleDateString('fa-IR')
+  const addBlock = (type: BlockType, index?: number) => {
+    const newBlock: EmailBlock = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      ...JSON.parse(JSON.stringify(defaultBlocks[type])) // Deep copy
     };
 
-    const updated = [newTemplate, ...savedTemplates];
-    saveToLocalStorage(updated);
-    setShowSaveModal(false);
-    setNewTemplateName('');
-    alert('قالب با موفقیت ذخیره شد.');
+    if (index !== undefined) {
+      const newBlocks = [...blocks];
+      newBlocks.splice(index, 0, newBlock);
+      setBlocks(newBlocks);
+    } else {
+      setBlocks([...blocks, newBlock]);
+    }
+    setSelectedBlockId(newBlock.id);
   };
 
-  const handleDeleteTemplate = (id: string) => {
-    const updated = savedTemplates.filter(t => t.id !== id);
-    saveToLocalStorage(updated);
+  const updateBlock = (id: string, updates: Partial<EmailBlock>) => {
+    setBlocks(blocks.map(b => b.id === id ? { ...b, ...updates } : b));
   };
 
-  const handleLoadTemplate = (template: SavedTemplate) => {
-    setHtmlContent(template.content);
-    setShowLoadModal(false);
+  const updateBlockContent = (id: string, field: string, value: any) => {
+    setBlocks(blocks.map(b => b.id === id ? { ...b, content: { ...b.content, [field]: value } } : b));
   };
 
-  const handleUpdateImage = (index: number, newUrl: string) => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlContent, 'text/html');
-    const imgs = doc.getElementsByTagName('img');
-    
-    if (imgs[index]) {
-      imgs[index].src = newUrl;
-      // We serialize the documentElement to get the full HTML
-      setHtmlContent(doc.documentElement.outerHTML);
+  const updateBlockStyle = (id: string, field: string, value: any) => {
+    setBlocks(blocks.map(b => b.id === id ? { ...b, styles: { ...b.styles, [field]: value } } : b));
+  };
+
+  const updateBlockNestedStyle = (id: string, category: string, field: string, value: any) => {
+    setBlocks(blocks.map(b => 
+      b.id === id ? { 
+        ...b, 
+        styles: { 
+          ...b.styles, 
+          [category]: { ...b.styles[category], [field]: value } 
+        } 
+      } : b
+    ));
+  };
+
+  const removeBlock = (id: string) => {
+    setBlocks(blocks.filter(b => b.id !== id));
+    if (selectedBlockId === id) setSelectedBlockId(null);
+  };
+
+  const moveBlock = (id: string, direction: 'up' | 'down') => {
+    const index = blocks.findIndex(b => b.id === id);
+    if (index < 0) return;
+    if (direction === 'up' && index > 0) {
+      const newBlocks = [...blocks];
+      [newBlocks[index - 1], newBlocks[index]] = [newBlocks[index], newBlocks[index - 1]];
+      setBlocks(newBlocks);
+    } else if (direction === 'down' && index < blocks.length - 1) {
+      const newBlocks = [...blocks];
+      [newBlocks[index + 1], newBlocks[index]] = [newBlocks[index], newBlocks[index + 1]];
+      setBlocks(newBlocks);
     }
   };
 
-  const handleImageUpload = (index: number, file: File) => {
-    if (file) {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && selectedBlockId) {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const newUrl = e.target?.result as string;
-        handleUpdateImage(index, newUrl);
+      reader.onload = (event) => {
+        if (event.target?.result) {
+           updateBlockContent(selectedBlockId, 'logoUrl', event.target.result);
+        }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const generateTemplate = async () => {
-    if (!prompt) return;
-    setIsLoading(true);
+  const handleSourceTypeChange = (type: string) => {
+    if (!selectedBlock) return;
+    
+    // Create new styles object to avoid mutation
+    const newStyles = { ...selectedBlock.styles };
+    const newContent = { ...selectedBlock.content, sourceType: type };
+
+    if (type === 'pattern') {
+      // Auto-configure for full-width pattern
+      newStyles.width = '100%';
+      newStyles.height = '150px';
+      newStyles.padding = '0px'; // Remove padding to fill section
+      newStyles.objectFit = 'cover';
+    } else if (type === 'url' || type === 'upload') {
+      // Restore logo defaults if values match pattern defaults
+      if (newStyles.width === '100%') newStyles.width = '200px';
+      if (newStyles.height === '150px') newStyles.height = 'auto';
+      if (newStyles.padding === '0px') newStyles.padding = '20px';
+      newStyles.objectFit = 'contain';
+    }
+
+    updateBlock(selectedBlock.id, {
+      content: newContent,
+      styles: newStyles
+    });
+  };
+
+  const handleDisplayModeChange = (mode: 'contain' | 'cover' | 'fill') => {
+    if (!selectedBlock) return;
+    const newStyles = { ...selectedBlock.styles, objectFit: mode };
+    
+    // Auto-adjust dimensions for better UX based on mode
+    if (mode === 'fill' || mode === 'cover') { // Stretch or Fill
+        newStyles.width = '100%';
+        if (newStyles.height === 'auto') newStyles.height = '200px';
+        newStyles.padding = '0px';
+    } else { // Fit
+        newStyles.width = '200px';
+        newStyles.height = 'auto';
+        newStyles.padding = '20px';
+    }
+    
+    updateBlock(selectedBlock.id, { styles: newStyles });
+  };
+
+  const handleGenerateAi = async () => {
+    if (!aiPrompt) return;
+    setIsAiLoading(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Structured JSON Prompt
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `You are a world-class email developer.
-        Create a modern, responsive HTML email template based on this request: "${prompt}".
+        contents: `Create an email template for: "${aiPrompt}".
         
-        CRITICAL RULES:
-        1. **FONT**: You MUST include this link in <head>: <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
-           Apply "font-family: 'Vazirmatn', sans-serif;" to the body, tables, tds, ps, and ALL text elements.
-        2. **IMAGES**: Use "https://dummyimage.com" for placeholders as it is robust.
-           - Banner example: "https://dummyimage.com/600x300/2563eb/fff&text=Banner"
-           - Product example: "https://dummyimage.com/200x200/e2e8f0/475569&text=Product"
-           - Do NOT use spaces in URLs.
-        3. **DIRECTION**: Set <html dir="rtl" lang="fa">.
-        4. **DESIGN**: Use a centered layout (max-width: 600px). White container on a gray background (#f3f4f6). Use inline CSS for compatibility.
-        
-        Return ONLY the raw HTML code. No markdown, no explanations.`,
-      });
-      
-      let cleanHtml = response.text || '';
-      cleanHtml = cleanHtml.replace(/```html/g, '').replace(/```/g, '');
-      
-      // --- FORCE INJECT FONT & STYLES ---
-      const fontInjection = `
-        <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');
-          body, table, td, p, a, li, blockquote, div, span, h1, h2, h3, h4 {
-            font-family: 'Vazirmatn', Tahoma, Arial, sans-serif !important;
-          }
-        </style>
-      `;
-      
-      if (cleanHtml.includes('</head>')) {
-        cleanHtml = cleanHtml.replace('</head>', `${fontInjection}</head>`);
-      } else {
-        cleanHtml = fontInjection + cleanHtml;
-      }
+        Return a JSON OBJECT with a key "blocks". The value must be an array of objects matching this structure:
+        { "type": "header" | "text" | "button" | "image" | "footer", "content": { ... }, "styles": { ... } }
 
-      setHtmlContent(cleanHtml);
+        Content fields per type:
+        - header: { logoUrl, alt, link }
+        - text: { title, body }
+        - button: { text, link }
+        - image: { imageUrl, alt, link }
+        - footer: { text, unsubscribeText, unsubscribeLink }
+
+        Style fields (optional but recommended): backgroundColor, color, align (right/center/left), padding.
+
+        IMPORTANT:
+        - Use Persian language for text.
+        - Use 'https://placehold.co/600x300/png' for placeholder images.
+        - Ensure "text" blocks are aligned "right" (RTL).
+        
+        Return ONLY valid JSON.`,
+        config: { responseMimeType: "application/json" }
+      });
+
+      const json = JSON.parse(response.text || '{}');
+      if (json.blocks && Array.isArray(json.blocks)) {
+        // Add IDs to blocks
+        const newBlocks = json.blocks.map((b: any) => ({
+          ...b,
+          id: Date.now().toString() + Math.random().toString(),
+          // Merge with default styles to ensure nothing breaks
+          styles: { ...defaultBlocks[b.type as BlockType]?.styles, ...b.styles }
+        }));
+        setBlocks(newBlocks);
+      }
     } catch (error) {
-      console.error("Error generating email:", error);
-      alert("متاسفانه مشکلی در تولید قالب پیش آمد. لطفا مجدد تلاش کنید.");
+      console.error("AI Error:", error);
+      alert("خطا در تولید هوشمند.");
     } finally {
-      setIsLoading(false);
+      setIsAiLoading(false);
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(htmlContent);
-    alert('کد HTML در حافظه کپی شد!');
+  const saveTemplate = () => {
+    if (!templateName) return;
+    const newTemplate: SavedTemplate = {
+      id: Date.now().toString(),
+      name: templateName,
+      blocks: blocks,
+      date: new Date().toLocaleDateString('fa-IR')
+    };
+    const updated = [newTemplate, ...savedTemplates];
+    setSavedTemplates(updated);
+    localStorage.setItem('peiksa_email_templates', JSON.stringify(updated));
+    setShowSaveModal(false);
+    setTemplateName('');
   };
+
+  const loadTemplate = (template: SavedTemplate) => {
+    setBlocks(template.blocks);
+    setShowLoadModal(false);
+  };
+
+  const selectedBlock = blocks.find(b => b.id === selectedBlockId);
+
+  // --- HTML for Code View ---
+  const rawHtml = generateHtmlFromBlocks(blocks);
 
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
-      {/* Compact Header */}
-      <div className="flex items-center justify-between shrink-0 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
-            <PenTool size={18} />
-          </div>
-          ایمیل ساز هوشمند
-        </h1>
+      
+      {/* --- Top Bar --- */}
+      <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
+        <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2">
+             <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+               <PenTool size={18} />
+             </div>
+             <h1 className="text-lg font-bold text-slate-900">ایمیل ساز</h1>
+           </div>
+           
+           <div className="h-6 w-px bg-slate-200 mx-2"></div>
+
+           <div className="flex bg-slate-100 p-1 rounded-lg">
+             <button 
+               onClick={() => setActiveTab('design')}
+               className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-all ${activeTab === 'design' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+               <LayoutTemplate size={14} />
+               طراحی بصری
+             </button>
+             <button 
+               onClick={() => setActiveTab('code')}
+               className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-all ${activeTab === 'code' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+               <Code size={14} />
+               کد خروجی
+             </button>
+           </div>
+        </div>
+
         <div className="flex gap-2">
-           <Button 
-             variant="outline" 
-             size="sm" 
-             onClick={() => setShowLoadModal(true)}
-             className="text-slate-600 border-slate-300 hover:bg-slate-50"
-           >
-             <FolderOpen size={16} className="mr-2" />
-             قالب‌های ذخیره شده
-           </Button>
-           <Button 
-             size="sm" 
-             onClick={() => setShowSaveModal(true)}
-             disabled={!htmlContent}
-             className="bg-green-600 hover:bg-green-700 border-none"
-           >
-             <Save size={16} className="mr-2" />
-             ذخیره قالب
-           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowLoadModal(true)}>
+            <FolderOpen size={16} className="mr-2" />
+            قالب‌ها
+          </Button>
+          <Button size="sm" onClick={() => setShowSaveModal(true)} disabled={blocks.length === 0} className="bg-green-600 hover:bg-green-700 border-none">
+            <Save size={16} className="mr-2" />
+            ذخیره
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
-        {/* Control Panel */}
-        <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-          
-          {/* Top Section: Input & Generate */}
-          <div className="p-4 border-b border-slate-100 shrink-0">
-            <h3 className="font-bold text-slate-900 mb-3 text-sm">دستورات هوش مصنوعی</h3>
-            <div className="space-y-3">
-              <div className="relative">
-                <textarea 
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="مثال: ایمیل فروش ویژه یلدا با تم قرمز..."
-                  className="w-full h-32 p-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all resize-none text-slate-900 text-sm leading-relaxed placeholder:text-slate-400"
-                ></textarea>
-                <div className="absolute bottom-3 left-3 text-blue-500">
-                   <Sparkles size={16} />
+      {/* --- Main Workspace --- */}
+      <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
+        
+        {/* --- Left: Properties Panel (Contextual) --- */}
+        <AnimatePresence mode="wait">
+          {selectedBlock ? (
+             <motion.div 
+               key="properties"
+               initial={{ width: 0, opacity: 0 }}
+               animate={{ width: 320, opacity: 1 }}
+               exit={{ width: 0, opacity: 0 }}
+               className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden"
+             >
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                   <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                      <Settings size={16} />
+                      تنظیمات بلوک
+                   </h3>
+                   <button onClick={() => setSelectedBlockId(null)}><X size={16} className="text-slate-400" /></button>
                 </div>
-              </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                   
+                   {/* HEADER SPECIFIC SETTINGS */}
+                   {selectedBlock.type === 'header' && (
+                     <>
+                      {/* Image Source Selection */}
+                      <div className="space-y-3">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">منبع تصویر</div>
+                        <div className="flex bg-slate-100 p-1 rounded-lg mb-3">
+                           {['url', 'upload', 'pattern'].map((type) => (
+                             <button
+                               key={type}
+                               onClick={() => handleSourceTypeChange(type)}
+                               className={`flex-1 py-1.5 text-xs font-bold rounded-md capitalize transition-all ${selectedBlock.content.sourceType === type ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                             >
+                               {type === 'url' ? 'لینک' : type === 'upload' ? 'آپلود' : 'پترن'}
+                             </button>
+                           ))}
+                        </div>
 
-              <Button 
-                fullWidth 
-                onClick={generateTemplate}
-                disabled={isLoading || !prompt}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/30"
-              >
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                     <RefreshCw size={18} className="animate-spin" />
-                     در حال پردازش...
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                     <Sparkles size={18} />
-                     تولید قالب جدید
-                  </div>
-                )}
-              </Button>
-            </div>
-          </div>
+                        {selectedBlock.content.sourceType === 'url' && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 mb-1 block">آدرس تصویر</label>
+                            <div className="flex gap-2">
+                               <input 
+                                 type="text" dir="ltr"
+                                 value={selectedBlock.content.logoUrl}
+                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'logoUrl', e.target.value)}
+                                 className="flex-1 p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-slate-900"
+                               />
+                               <button className="p-2 bg-slate-100 rounded-lg text-slate-500">
+                                 <Upload size={16} onClick={() => fileInputRef.current?.click()} />
+                               </button>
+                            </div>
+                          </div>
+                        )}
 
-          {/* Bottom Section: Image Manager (Fills the gap) */}
-          <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <ImageIcon size={16} className="text-slate-500" />
-                مدیریت تصاویر
-              </h3>
-              <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                {detectedImages.length} تصویر یافت شد
-              </span>
-            </div>
+                        {selectedBlock.content.sourceType === 'upload' && (
+                          <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                             <Upload size={24} className="mx-auto text-slate-400 mb-2" />
+                             <p className="text-xs text-slate-500">برای آپلود کلیک کنید</p>
+                             <input 
+                               ref={fileInputRef}
+                               type="file" 
+                               accept="image/*" 
+                               className="hidden" 
+                               onChange={handleFileUpload}
+                             />
+                          </div>
+                        )}
 
-            {detectedImages.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-                 <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
-                 <p className="text-xs">پس از تولید قالب، تصاویر اینجا نمایش داده می‌شوند.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {detectedImages.map((img) => (
-                   <div key={img.index} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                      <div className="flex gap-3 mb-2">
-                         <div className="w-12 h-12 bg-slate-100 rounded-lg overflow-hidden shrink-0 border border-slate-200">
-                            <img src={img.src} alt="thumbnail" className="w-full h-full object-cover" />
-                         </div>
-                         <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold text-slate-700 truncate mb-1">تصویر #{img.index + 1}</div>
-                            <div className="text-[10px] text-slate-400 truncate" dir="ltr">
-                               {img.src.startsWith('data:') ? '(تصویر آپلود شده)' : img.src}
+                        {selectedBlock.content.sourceType === 'pattern' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {PATTERNS.map((pat) => (
+                              <button 
+                                key={pat.id}
+                                onClick={() => updateBlockContent(selectedBlock.id, 'patternId', pat.id)}
+                                className={`h-16 rounded-lg border-2 overflow-hidden relative transition-all ${selectedBlock.content.patternId === pat.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-100 hover:border-slate-300'}`}
+                                style={pat.preview}
+                              >
+                                <span className="absolute bottom-0 left-0 right-0 bg-white/80 text-[9px] text-center py-0.5 text-slate-600 font-bold backdrop-blur-sm">
+                                  {pat.name}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Link Input for Header */}
+                        <div className="mt-2">
+                           <label className="text-xs font-bold text-slate-700 mb-1 block">لینک مقصد (اختیاری)</label>
+                           <input 
+                             type="text" dir="ltr"
+                             value={selectedBlock.content.link}
+                             onChange={(e) => updateBlockContent(selectedBlock.id, 'link', e.target.value)}
+                             className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-left text-slate-900"
+                             placeholder="https://"
+                           />
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-slate-100 my-4"></div>
+
+                      {/* Sizing & Fit */}
+                      <div className="space-y-3">
+                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ابعاد و نمایش</div>
+                         
+                         <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs font-bold text-slate-700 mb-1 block">عرض</label>
+                              <input 
+                                type="text" dir="ltr"
+                                value={selectedBlock.styles.width || '200px'}
+                                onChange={(e) => updateBlockStyle(selectedBlock.id, 'width', e.target.value)}
+                                className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-900"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-bold text-slate-700 mb-1 block">ارتفاع</label>
+                              <input 
+                                type="text" dir="ltr"
+                                value={selectedBlock.styles.height || 'auto'}
+                                onChange={(e) => updateBlockStyle(selectedBlock.id, 'height', e.target.value)}
+                                className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-900"
+                              />
                             </div>
                          </div>
+
+                         {selectedBlock.content.sourceType !== 'pattern' && (
+                           <div>
+                             <label className="text-xs font-bold text-slate-700 mb-1 block">نحوه نمایش (Object Fit)</label>
+                             <div className="flex bg-slate-100 p-1 rounded-lg">
+                                {[
+                                  { val: 'contain', icon: Minimize, label: 'Fit' },
+                                  { val: 'cover', icon: Maximize, label: 'Fill' },
+                                  { val: 'fill', icon: ArrowLeftRight, label: 'Stretch' }
+                                ].map((opt) => (
+                                  <button
+                                    key={opt.val}
+                                    onClick={() => handleDisplayModeChange(opt.val as any)}
+                                    className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-md transition-all ${selectedBlock.styles.objectFit === opt.val ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                    title={opt.label}
+                                  >
+                                    <opt.icon size={14} />
+                                    <span className="text-[9px] font-bold">{opt.label}</span>
+                                  </button>
+                                ))}
+                             </div>
+                           </div>
+                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
-                           <input 
-                             type="text" 
-                             value={img.src.startsWith('data:') ? '' : img.src}
-                             placeholder={img.src.startsWith('data:') ? "تصویر آپلود شده (غیرقابل ویرایش متنی)" : "لینک تصویر..."}
-                             readOnly={img.src.startsWith('data:')}
-                             className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 text-slate-900 focus:bg-white focus:border-blue-500 outline-none text-left dir-ltr"
-                             dir="ltr"
-                             onChange={(e) => handleUpdateImage(img.index, e.target.value)}
-                           />
-                           <LinkIcon size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        </div>
+
+                      <div className="h-px bg-slate-100 my-4"></div>
+
+                      {/* Filters */}
+                      <div className="space-y-4">
+                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">فیلترهای تصویر</div>
+                         
+                         <div className="space-y-3">
+                            {[
+                              { label: 'روشنایی', key: 'brightness', icon: Sun },
+                              { label: 'کنتراست', key: 'contrast', icon: BoxSelect },
+                              { label: 'اشباع رنگ', key: 'saturate', icon: Droplet },
+                            ].map((filter) => (
+                              <div key={filter.key}>
+                                 <div className="flex justify-between mb-1">
+                                    <label className="text-[10px] font-bold text-slate-600 flex items-center gap-1">
+                                      <filter.icon size={10} /> {filter.label}
+                                    </label>
+                                    <span className="text-[10px] text-slate-400">{selectedBlock.styles.filter?.[filter.key] || 100}%</span>
+                                 </div>
+                                 <input 
+                                   type="range" 
+                                   min="0" max="200" 
+                                   value={selectedBlock.styles.filter?.[filter.key] || 100}
+                                   onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'filter', filter.key, e.target.value)}
+                                   className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                 />
+                              </div>
+                            ))}
+                         </div>
+                      </div>
+
+                      <div className="h-px bg-slate-100 my-4"></div>
+
+                      {/* Drop Shadow */}
+                      <div className="space-y-3">
+                         <div className="flex items-center justify-between">
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">سایه (PNG)</div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedBlock.styles.dropShadow?.enabled || false}
+                                onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'enabled', e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                         </div>
+
+                         {selectedBlock.styles.dropShadow?.enabled && (
+                           <div className="bg-slate-50 p-3 rounded-xl space-y-3">
+                              <div className="flex items-center gap-2">
+                                 <div className="w-8 h-8 rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                                   <input 
+                                     type="color" 
+                                     value={selectedBlock.styles.dropShadow?.color || '#000000'}
+                                     onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'color', e.target.value)}
+                                     className="w-full h-full p-0 border-none cursor-pointer scale-150"
+                                   />
+                                 </div>
+                                 <div className="flex-1 space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-600">محوی (Blur)</label>
+                                    <input 
+                                      type="range" min="0" max="20" 
+                                      value={selectedBlock.styles.dropShadow?.blur || 0}
+                                      onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'blur', e.target.value)}
+                                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600"
+                                    />
+                                 </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                 <div>
+                                    <label className="text-[10px] font-bold text-slate-600 block mb-1">افقی X</label>
+                                    <input 
+                                      type="number" 
+                                      value={selectedBlock.styles.dropShadow?.x || 0}
+                                      onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'x', e.target.value)}
+                                      className="w-full p-1 text-center text-xs border border-slate-200 rounded bg-white text-slate-900"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="text-[10px] font-bold text-slate-600 block mb-1">عمودی Y</label>
+                                    <input 
+                                      type="number" 
+                                      value={selectedBlock.styles.dropShadow?.y || 0}
+                                      onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'y', e.target.value)}
+                                      className="w-full p-1 text-center text-xs border border-slate-200 rounded bg-white text-slate-900"
+                                    />
+                                 </div>
+                              </div>
+                              <div>
+                                 <div className="flex justify-between items-center mb-1">
+                                    <label className="text-[10px] font-bold text-slate-600 block">شفافیت (Opacity)</label>
+                                    <span className="text-[10px] text-slate-400">{Math.round((selectedBlock.styles.dropShadow?.opacity ?? 0.3) * 100)}%</span>
+                                 </div>
+                                 <input 
+                                   type="range" min="0" max="1" step="0.01"
+                                   value={selectedBlock.styles.dropShadow?.opacity ?? 0.3}
+                                   onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'opacity', parseFloat(e.target.value))}
+                                   className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600"
+                                 />
+                              </div>
+                           </div>
+                         )}
+                      </div>
+
+                     </>
+                   )}
+                   {/* END HEADER SETTINGS */}
+
+
+                   {/* COMMON CONTENT FIELDS (Non-Header) */}
+                   {selectedBlock.type !== 'header' && (
+                     <div className="space-y-4">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">محتوا</div>
                         
-                        <input
-                           type="file"
-                           id={`upload-${img.index}`}
-                           className="hidden"
-                           accept="image/*"
-                           onChange={(e) => {
-                               if (e.target.files?.[0]) handleImageUpload(img.index, e.target.files[0]);
-                           }}
-                        />
-                        <label 
-                           htmlFor={`upload-${img.index}`}
-                           className="p-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors border border-blue-100"
-                           title="آپلود تصویر جایگزین"
-                        >
-                           <Upload size={16} />
-                        </label>
+                        {selectedBlock.type === 'text' && (
+                          <>
+                             <div>
+                               <label className="text-xs font-bold text-slate-700 mb-1 block">عنوان</label>
+                               <input 
+                                 type="text" 
+                                 value={selectedBlock.content.title}
+                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'title', e.target.value)}
+                                 className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-slate-900"
+                               />
+                             </div>
+                             <div>
+                               <label className="text-xs font-bold text-slate-700 mb-1 block">متن اصلی</label>
+                               <textarea 
+                                 value={selectedBlock.content.body}
+                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'body', e.target.value)}
+                                 rows={5}
+                                 className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-slate-900"
+                               />
+                             </div>
+                          </>
+                        )}
+
+                        {(selectedBlock.type === 'image') && (
+                          <>
+                             <div>
+                               <label className="text-xs font-bold text-slate-700 mb-1 block">آدرس تصویر</label>
+                               <input 
+                                 type="text" dir="ltr"
+                                 value={selectedBlock.content.imageUrl}
+                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'imageUrl', e.target.value)}
+                                 className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-left text-slate-900"
+                               />
+                             </div>
+                          </>
+                        )}
+
+                        {selectedBlock.type === 'button' && (
+                          <>
+                             <div>
+                               <label className="text-xs font-bold text-slate-700 mb-1 block">متن دکمه</label>
+                               <input 
+                                 type="text" 
+                                 value={selectedBlock.content.text}
+                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'text', e.target.value)}
+                                 className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-slate-900"
+                               />
+                             </div>
+                          </>
+                        )}
+
+                        {/* General Link Field for All Non-Header Blocks */}
+                        <div>
+                           <label className="text-xs font-bold text-slate-700 mb-1 block">
+                             {selectedBlock.type === 'footer' ? 'لینک عمومی (اختیاری)' : 'لینک مقصد'}
+                           </label>
+                           <input 
+                             type="text" dir="ltr"
+                             value={selectedBlock.content.link}
+                             onChange={(e) => updateBlockContent(selectedBlock.id, 'link', e.target.value)}
+                             className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-left text-slate-900"
+                             placeholder="https://"
+                           />
+                        </div>
+                     </div>
+                   )}
+
+                   {/* COMMON STYLE FIELDS */}
+                   <div className="space-y-4 pt-4 border-t border-slate-100">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ظاهر</div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                         <div>
+                            <label className="text-xs font-bold text-slate-700 mb-1 block">پس‌زمینه</label>
+                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg p-1 bg-slate-50">
+                               <input 
+                                 type="color" 
+                                 value={selectedBlock.styles.backgroundColor}
+                                 onChange={(e) => updateBlockStyle(selectedBlock.id, 'backgroundColor', e.target.value)}
+                                 className="w-6 h-6 rounded cursor-pointer border-none p-0"
+                               />
+                               <span className="text-[10px] text-slate-500 font-mono" dir="ltr">{selectedBlock.styles.backgroundColor}</span>
+                            </div>
+                         </div>
+                         {selectedBlock.styles.color && (
+                           <div>
+                              <label className="text-xs font-bold text-slate-700 mb-1 block">رنگ متن</label>
+                              <div className="flex items-center gap-2 border border-slate-200 rounded-lg p-1 bg-slate-50">
+                                 <input 
+                                   type="color" 
+                                   value={selectedBlock.styles.color}
+                                   onChange={(e) => updateBlockStyle(selectedBlock.id, 'color', e.target.value)}
+                                   className="w-6 h-6 rounded cursor-pointer border-none p-0"
+                                 />
+                              </div>
+                           </div>
+                         )}
                       </div>
+
+                      {selectedBlock.styles.align && (
+                        <div>
+                           <label className="text-xs font-bold text-slate-700 mb-1 block">چیدمان</label>
+                           <div className="flex bg-slate-100 p-1 rounded-lg">
+                              {['right', 'center', 'left'].map(align => (
+                                 <button
+                                   key={align}
+                                   onClick={() => updateBlockStyle(selectedBlock.id, 'align', align)}
+                                   className={`flex-1 py-1 rounded flex items-center justify-center ${selectedBlock.styles.align === align ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
+                                 >
+                                    {align === 'right' ? <AlignRight size={16} /> : align === 'center' ? <AlignCenter size={16} /> : <AlignLeft size={16} />}
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
+                      )}
                    </div>
-                ))}
+                </div>
+
+                <div className="p-4 border-t border-slate-100 bg-slate-50">
+                   <button 
+                     onClick={() => removeBlock(selectedBlock.id)}
+                     className="w-full flex items-center justify-center gap-2 text-red-600 bg-white border border-red-100 hover:bg-red-50 py-2 rounded-lg text-xs font-bold transition-colors"
+                   >
+                      <Trash2 size={14} />
+                      حذف این بلوک
+                   </button>
+                </div>
+             </motion.div>
+          ) : (
+             <motion.div 
+               key="ai-panel"
+               initial={{ width: 320, opacity: 1 }}
+               exit={{ width: 0, opacity: 0 }}
+               className="w-80 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden"
+             >
+                <div className="p-4 border-b border-slate-100 bg-slate-50">
+                   <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                      <Sparkles size={16} className="text-purple-600" />
+                      تولید هوشمند (AI)
+                   </h3>
+                </div>
+                <div className="p-4 flex-1">
+                   <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                      هوش مصنوعی ساختار ایمیل شما را با استفاده از کامپوننت‌های موجود می‌سازد. سپس می‌توانید هر بخش را ویرایش کنید.
+                   </p>
+                   <textarea
+                     value={aiPrompt}
+                     onChange={(e) => setAiPrompt(e.target.value)}
+                     placeholder="مثال: ایمیل خوش‌آمدگویی برای فروشگاه لباس با کد تخفیف..."
+                     className="w-full h-32 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500/20 resize-none mb-4 text-slate-900"
+                   />
+                   <Button 
+                     fullWidth 
+                     onClick={handleGenerateAi} 
+                     disabled={isAiLoading || !aiPrompt}
+                     className="bg-purple-600 hover:bg-purple-700 border-none"
+                   >
+                      {isAiLoading ? (
+                        <RefreshCw size={16} className="animate-spin" />
+                      ) : (
+                        <>
+                          <Sparkles size={16} className="mr-2" />
+                          تولید قالب
+                        </>
+                      )}
+                   </Button>
+                </div>
+             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* --- Center: Canvas --- */}
+        <div className="flex-1 bg-slate-100 rounded-xl overflow-hidden shadow-inner relative flex flex-col">
+           {activeTab === 'code' ? (
+              <div className="flex-1 overflow-auto bg-[#1e1e1e] p-6 text-slate-300 font-mono text-xs leading-relaxed" dir="ltr">
+                 <pre>{rawHtml}</pre>
               </div>
-            )}
-          </div>
+           ) : (
+              <div 
+                className="flex-1 overflow-y-auto p-8 flex justify-center"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragItem.current) {
+                    addBlock(dragItem.current);
+                    dragItem.current = null;
+                  }
+                }}
+              >
+                 <div className="w-full max-w-[600px] min-h-[500px] bg-white shadow-2xl shadow-slate-300/50 flex flex-col" style={{ direction: 'rtl' }}>
+                    {blocks.length === 0 ? (
+                       <div className="flex-1 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 m-4 rounded-xl">
+                          <MousePointer2 size={48} className="mb-4 opacity-50" />
+                          <p className="text-sm font-bold">المان‌ها را اینجا رها کنید</p>
+                          <p className="text-xs mt-2">یا از هوش مصنوعی کمک بگیرید</p>
+                       </div>
+                    ) : (
+                       <Reorder.Group axis="y" values={blocks} onReorder={setBlocks} className="flex flex-col h-full">
+                          {blocks.map((block) => (
+                             <Reorder.Item key={block.id} value={block}>
+                                <div 
+                                  onClick={() => setSelectedBlockId(block.id)}
+                                  className={`relative group cursor-pointer transition-all ${selectedBlockId === block.id ? 'ring-2 ring-blue-500 z-10' : 'hover:ring-1 hover:ring-blue-300'}`}
+                                >
+                                   {/* Block Actions Overlay */}
+                                   <div className={`absolute top-0 right-[-32px] flex flex-col gap-1 opacity-0 group-hover:opacity-100 ${selectedBlockId === block.id ? 'opacity-100' : ''}`}>
+                                      <button onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'up')}} className="p-1 bg-white border border-slate-200 rounded text-slate-500 hover:text-blue-600"><MoveUp size={14} /></button>
+                                      <button onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'down')}} className="p-1 bg-white border border-slate-200 rounded text-slate-500 hover:text-blue-600"><MoveDown size={14} /></button>
+                                   </div>
+
+                                   {/* Render Block Content (Simplified Preview) */}
+                                   <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: generateHtmlFromBlocks([block]).match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || '' }} />
+                                </div>
+                             </Reorder.Item>
+                          ))}
+                       </Reorder.Group>
+                    )}
+                 </div>
+              </div>
+           )}
         </div>
 
-        {/* Preview Panel */}
-        <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-          <div className="border-b border-slate-100 p-2 flex items-center justify-between bg-slate-50/50 shrink-0">
-            <div className="flex bg-slate-200/50 p-0.5 rounded-lg">
-              <button 
-                onClick={() => setActiveTab('preview')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 ${activeTab === 'preview' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <Eye size={14} />
-                پیش‌نمایش
-              </button>
-              <button 
-                onClick={() => setActiveTab('code')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 ${activeTab === 'code' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <Code size={14} />
-                کد HTML
-              </button>
-            </div>
-
-            {htmlContent && (
-              <button 
-                onClick={copyToClipboard}
-                className="text-slate-400 hover:text-blue-600 transition-colors p-1.5 hover:bg-blue-50 rounded-lg"
-                title="کپی کد"
-              >
-                <Copy size={16} />
-              </button>
-            )}
-          </div>
-
-          <div className="flex-1 bg-slate-100 relative overflow-hidden">
-            {htmlContent ? (
-              activeTab === 'preview' ? (
-                <iframe 
-                  title="Preview"
-                  srcDoc={htmlContent}
-                  className="w-full h-full border-none bg-white"
-                />
-              ) : (
-                <div className="w-full h-full overflow-auto p-4 bg-[#1e1e1e] text-slate-300 font-mono text-xs leading-relaxed" dir="ltr">
-                  <pre>{htmlContent}</pre>
+        {/* --- Right: Component Library --- */}
+        <div className="w-64 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+           <div className="p-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                 <LayoutTemplate size={16} />
+                 کتابخانه المان‌ها
+              </h3>
+           </div>
+           
+           <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 gap-3 content-start">
+              {[
+                { type: 'header', label: 'هدر / لوگو', icon: LayoutTemplate },
+                { type: 'text', label: 'متن', icon: Type },
+                { type: 'button', label: 'دکمه', icon: MousePointer2 },
+                { type: 'image', label: 'تصویر', icon: ImageIcon },
+                { type: 'spacer', label: 'فاصله', icon: GripVertical },
+                { type: 'footer', label: 'پاورقی', icon: Globe },
+              ].map((item) => (
+                <div
+                  key={item.type}
+                  draggable
+                  onDragStart={() => { dragItem.current = item.type as BlockType }}
+                  onClick={() => addBlock(item.type as BlockType)}
+                  className="flex items-center gap-3 p-3 bg-slate-50 hover:bg-white border border-slate-100 hover:border-blue-200 hover:shadow-md rounded-xl cursor-grab active:cursor-grabbing transition-all group"
+                >
+                   <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-500 group-hover:text-blue-600 transition-colors">
+                      <item.icon size={16} />
+                   </div>
+                   <span className="text-sm font-medium text-slate-700">{item.label}</span>
+                   <Plus size={14} className="mr-auto text-slate-300 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all" />
                 </div>
-              )
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-3">
-                <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center rotate-3">
-                  <Mail size={32} className="-rotate-3" />
-                </div>
-                <p className="text-sm font-medium">هنوز قالبی تولید نشده است</p>
-                <p className="text-xs text-slate-400 max-w-xs text-center">توضیحات خود را در پنل سمت راست بنویسید و دکمه تولید را بزنید</p>
-              </div>
-            )}
-          </div>
+              ))}
+           </div>
         </div>
+
       </div>
 
+      {/* --- Modals (Save/Load) --- */}
       {/* Save Modal */}
       <AnimatePresence>
         {showSaveModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-             <motion.div 
-               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-               className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-               onClick={() => setShowSaveModal(false)}
-             />
-             <motion.div 
-               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-               className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 p-6"
-             >
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowSaveModal(false)} />
+             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 p-6">
                 <div className="flex justify-between items-center mb-6">
-                   <h3 className="font-bold text-lg text-slate-900">ذخیره قالب</h3>
+                   <h3 className="font-bold text-lg">ذخیره قالب</h3>
                    <button onClick={() => setShowSaveModal(false)}><X className="text-slate-400" /></button>
                 </div>
-                
-                <div className="mb-6">
-                   <label className="block text-sm font-bold text-slate-700 mb-2">نام قالب</label>
-                   <input 
-                     type="text" 
-                     autoFocus
-                     placeholder="مثال: خبرنامه یلدا ۱۴۰۳"
-                     value={newTemplateName}
-                     onChange={(e) => setNewTemplateName(e.target.value)}
-                     className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 outline-none transition-all"
-                   />
-                </div>
-
-                <div className="flex gap-3">
-                   <Button variant="ghost" onClick={() => setShowSaveModal(false)} fullWidth>انصراف</Button>
-                   <Button onClick={handleSaveTemplate} disabled={!newTemplateName} fullWidth>ذخیره</Button>
-                </div>
+                <input type="text" placeholder="نام قالب..." value={templateName} onChange={(e) => setTemplateName(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 mb-6 text-slate-900" />
+                <Button onClick={saveTemplate} disabled={!templateName} fullWidth>ذخیره</Button>
              </motion.div>
           </div>
         )}
@@ -416,52 +1078,26 @@ export const DashboardEmailBuilder: React.FC = () => {
       <AnimatePresence>
         {showLoadModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-             <motion.div 
-               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-               className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-               onClick={() => setShowLoadModal(false)}
-             />
-             <motion.div 
-               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-               className="bg-white rounded-2xl shadow-xl w-full max-w-2xl relative z-10 flex flex-col max-h-[80vh]"
-             >
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowLoadModal(false)} />
+             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-2xl shadow-xl w-full max-w-2xl relative z-10 flex flex-col max-h-[80vh]">
                 <div className="flex justify-between items-center p-6 border-b border-slate-100">
-                   <h3 className="font-bold text-lg text-slate-900">قالب‌های ذخیره شده</h3>
+                   <h3 className="font-bold text-lg">قالب‌های من</h3>
                    <button onClick={() => setShowLoadModal(false)}><X className="text-slate-400" /></button>
                 </div>
-                
-                <div className="p-6 overflow-y-auto flex-1">
-                   {savedTemplates.length === 0 ? (
-                      <div className="text-center text-slate-500 py-10">
-                         <FolderOpen size={48} className="mx-auto mb-4 opacity-20" />
-                         <p>هیچ قالبی ذخیره نشده است.</p>
+                <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {savedTemplates.map(t => (
+                      <div key={t.id} className="border border-slate-200 rounded-xl p-4 hover:border-blue-300 hover:bg-slate-50 cursor-pointer transition-all" onClick={() => loadTemplate(t)}>
+                         <h4 className="font-bold text-slate-800 mb-1">{t.name}</h4>
+                         <p className="text-xs text-slate-500">{t.date} • {t.blocks.length} بلوک</p>
                       </div>
-                   ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         {savedTemplates.map((template) => (
-                            <div key={template.id} className="border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors group relative bg-slate-50 hover:bg-white">
-                               <div className="flex justify-between items-start mb-2">
-                                  <h4 className="font-bold text-slate-800">{template.name}</h4>
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(template.id); }}
-                                    className="text-slate-400 hover:text-red-500 transition-colors"
-                                  >
-                                     <Trash2 size={16} />
-                                  </button>
-                               </div>
-                               <div className="text-xs text-slate-500 mb-4">{template.date}</div>
-                               <Button size="sm" fullWidth variant="outline" onClick={() => handleLoadTemplate(template)}>
-                                  انتخاب و ویرایش
-                               </Button>
-                            </div>
-                         ))}
-                      </div>
-                   )}
+                   ))}
+                   {savedTemplates.length === 0 && <p className="text-slate-500 text-center col-span-2">قالبی یافت نشد.</p>}
                 </div>
              </motion.div>
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 };

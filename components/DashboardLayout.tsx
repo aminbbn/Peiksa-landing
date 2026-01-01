@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutGrid, Users, Megaphone, BarChart3, Settings, LogOut, Menu, X, Bell, Search, PenTool } from 'lucide-react';
@@ -126,7 +127,7 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Page Content */}
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full h-full">
             <Outlet />
           </div>
         </main>

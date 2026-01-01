@@ -5,10 +5,11 @@ import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
   Sparkles, Code, Eye, Copy, RefreshCw, PenTool, Mail, Save, 
   FolderOpen, Trash2, X, Image as ImageIcon, Link as LinkIcon, 
-  Check, Upload, GripVertical, Plus, Type, LayoutTemplate, 
-  MousePointer2, Palette, AlignCenter, AlignRight, AlignLeft, 
+  Check, Upload, GripVertical, Plus, Minus, Type, LayoutTemplate, 
+  MousePointer2, Palette, AlignCenter, AlignRight, AlignLeft, AlignJustify,
   MoveUp, MoveDown, Settings, Globe, Sliders, BoxSelect, Sun, Droplet, Monitor, Grid,
-  Maximize, Minimize, Crop, ArrowLeftRight, Square, Circle
+  Maximize, Minimize, Crop, ArrowLeftRight, Square, Circle,
+  Bold, Italic, Underline as UnderlineIcon, Highlighter, Layers
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -44,6 +45,89 @@ const hexToRgba = (hex: string, alpha: number) => {
     b = parseInt(hex.slice(5, 7), 16);
   }
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+// --- Custom Fonts Data ---
+const CUSTOM_FONTS = [
+  {
+    name: 'Vazirmatn',
+    label: 'وزیر متن (پیش‌فرض)',
+    weights: {} // Loaded via Google Fonts
+  },
+  {
+    name: 'Alibaba',
+    label: 'علی‌بابا',
+    weights: {
+      300: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWkf5gVfoBlTIYdxai4rQEHcnsA2U9h6GjuS0O',
+      400: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWZRqaQHFcPkY6GDrEfWdIMTjSs0Kpob9aQ1iX',
+      700: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWgO3X5PspDO4ASPxof0THbtuFG2MZhqzaInkL',
+      900: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWJ0C7t3fqam3lisx10HfzQyVevtoFgcOWrZ6h'
+    }
+  },
+  {
+    name: 'IranSansX',
+    label: 'ایران سنس X',
+    weights: {
+      300: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWlXpawZELwJUzf2FbD8KRWXCtsdEMiuAgH46h',
+      400: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWVbuU7CWM5zho2G1wWpDkVltmeUsidASavyZb',
+      700: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWdXBm0zcYb9TX2i40Gw7yNtgknEQAPWJhYCO8',
+      900: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWcJ1aqLoBVpdvf7Fh5uzkeqXcwij9AGrOJSNP'
+    }
+  },
+  {
+    name: 'IranYekanX',
+    label: 'ایران یکان X',
+    weights: {
+      300: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWBGLtYsJKAFX4yvLPVJuZIR32w0NtCHDQUWn9',
+      400: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWa2f79QpV7nKCWNQtX5A9MYsSFDeirbP10oRI',
+      700: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWZRZhxYFcPkY6GDrEfWdIMTjSs0Kpob9aQ1iX',
+      900: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWfs65mC8DY5ZCS1wzthlRpLQNXIym98rOcGAU'
+    }
+  },
+  {
+    name: 'Kalameh',
+    label: 'کلمه',
+    weights: {
+      300: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWVT3sOoWM5zho2G1wWpDkVltmeUsidASavyZb',
+      400: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCW29LkvUeny6Ogrl37EXKGYBT5h0IWMd2FZi8q',
+      700: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWa2xFW0V7nKCWNQtX5A9MYsSFDeirbP10oRIw',
+      900: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWVeJ0dbeWM5zho2G1wWpDkVltmeUsidASavyZ'
+    }
+  },
+  {
+    name: 'Morabba',
+    label: 'مربع',
+    weights: {
+      300: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWjtbzDcv6CiBJP01qH5eQ2bfsWrEmvoOgzyuU',
+      400: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWiclVLz0cJxTw0VOF6pMD4zCgrRudNkyf9Pet',
+      700: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWxQohWCu4WLq4h6ZbegtSl8A7Xw2YKRnmpcVy',
+      900: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWU7ab5DqXzDcqJVGl0CnyekP8EL1HwAjtImBs'
+    }
+  },
+  {
+    name: 'YekanBakh',
+    label: 'یکان بخ',
+    weights: {
+      300: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCW9LVCq3lpBbjpnwL8W2sqZM5VekAc1RuxdJgy',
+      400: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWQpSGduaDupy5oitI9YSWV8a6NAL0mXBzjlRH',
+      700: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCW38IF3VLITClFo7fpPkWUuzGtn9BSM1EvXdHA',
+      900: 'https://famjljl5gg.ufs.sh/f/aej4FOV7nKCWMRRD5XDyP1TFSZvyopzXDRIbfcB5tC9nrKWw'
+    }
+  },
+];
+
+const generateFontCss = () => {
+  return CUSTOM_FONTS.filter(f => Object.keys(f.weights).length > 0).map(font => {
+    return Object.entries(font.weights).map(([weight, url]) => `
+      @font-face {
+        font-family: '${font.name}';
+        src: url('${url}') format('woff2');
+        font-weight: ${weight};
+        font-style: normal;
+        font-display: swap;
+      }
+    `).join('');
+  }).join('');
 };
 
 // --- Patterns (CSS Based) ---
@@ -131,8 +215,35 @@ const defaultBlocks: Record<BlockType, Omit<EmailBlock, 'id'>> = {
   },
   text: {
     type: 'text',
-    content: { title: 'عنوان اصلی', body: 'لورم ایپسوم متن ساختگی با تولید سادگی نامفهوم از صنعت چاپ و با استفاده از طراحان گرافیک است.', link: '' },
-    styles: { backgroundColor: '#ffffff', color: '#1e293b', align: 'right', padding: '24px' }
+    content: { 
+      text: 'لورم ایپسوم متن ساختگی با تولید سادگی نامفهوم از صنعت چاپ و با استفاده از طراحان گرافیک است.', 
+      link: '' 
+    },
+    styles: { 
+      backgroundColor: '#ffffff', 
+      color: '#1e293b', 
+      fontSize: '16', // px
+      fontWeight: '400',
+      fontFamily: 'Vazirmatn',
+      align: 'right', 
+      padding: '24px',
+      lineHeight: '1.6',
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      dropShadow: {
+        enabled: false,
+        color: '#000000',
+        blur: 2,
+        x: 1,
+        y: 1,
+        opacity: 0.2
+      },
+      stroke: {
+        enabled: false,
+        color: '#000000',
+        width: 1
+      }
+    }
   },
   button: {
     type: 'button',
@@ -159,6 +270,8 @@ const defaultBlocks: Record<BlockType, Omit<EmailBlock, 'id'>> = {
 // --- HTML Generator Helper ---
 
 const generateHtmlFromBlocks = (blocks: EmailBlock[]) => {
+  const fontCss = generateFontCss();
+  
   const bodyContent = blocks.map(block => {
     const { type, content, styles } = block;
     
@@ -203,12 +316,34 @@ const generateHtmlFromBlocks = (blocks: EmailBlock[]) => {
           </div>`;
 
       case 'text':
-        const textInner = `
-          ${content.title ? `<h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 24px; font-weight: bold; font-family: 'Vazirmatn', sans-serif;">${content.title}</h2>` : ''}
-          <p style="margin: 0; color: ${styles.color}; font-size: 16px; line-height: 1.6; font-family: 'Vazirmatn', sans-serif;">${content.body}</p>
+        let textShadow = '';
+        if (styles.dropShadow?.enabled) {
+          const shadowColor = hexToRgba(styles.dropShadow.color, styles.dropShadow.opacity ?? 1);
+          textShadow = `text-shadow: ${styles.dropShadow.x}px ${styles.dropShadow.y}px ${styles.dropShadow.blur}px ${shadowColor};`;
+        }
+
+        let textStroke = '';
+        if (styles.stroke?.enabled) {
+          textStroke = `-webkit-text-stroke: ${styles.stroke.width}px ${styles.stroke.color};`;
+        }
+
+        const textStyle = `
+          margin: 0;
+          color: ${styles.color};
+          font-size: ${styles.fontSize}px;
+          font-weight: ${styles.fontWeight};
+          font-family: '${styles.fontFamily}', sans-serif;
+          line-height: ${styles.lineHeight};
+          font-style: ${styles.fontStyle};
+          text-decoration: ${styles.textDecoration};
+          text-align: ${styles.align};
+          white-space: pre-line;
+          ${textShadow}
+          ${textStroke}
         `;
+        const textInner = `<div style="${textStyle}">${content.text}</div>`;
         return `
-          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: ${styles.align}; direction: rtl;">
+          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; direction: rtl;">
             ${content.link ? `<a href="${content.link}" style="text-decoration: none; display: block; color: inherit;">${textInner}</a>` : textInner}
           </div>`;
 
@@ -251,10 +386,11 @@ const generateHtmlFromBlocks = (blocks: EmailBlock[]) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;700;900&display=swap" rel="stylesheet">
 <style>
+  ${fontCss}
   body { margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Vazirmatn', sans-serif; }
-  * { font-family: 'Vazirmatn', sans-serif !important; }
+  * { box-sizing: border-box; }
   .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; overflow: hidden; }
   a { text-decoration: none; }
 </style>
@@ -424,7 +560,7 @@ export const DashboardEmailBuilder: React.FC = () => {
 
         Content fields per type:
         - header: { logoUrl, alt, link }
-        - text: { title, body }
+        - text: { text, link }
         - button: { text, link }
         - image: { imageUrl, alt, link }
         - footer: { text, unsubscribeText, unsubscribeLink }
@@ -433,7 +569,6 @@ export const DashboardEmailBuilder: React.FC = () => {
 
         IMPORTANT:
         - Use Persian language for text.
-        - Use 'https://placehold.co/600x300/png' for placeholder images.
         - Ensure "text" blocks are aligned "right" (RTL).
         
         Return ONLY valid JSON.`,
@@ -487,6 +622,9 @@ export const DashboardEmailBuilder: React.FC = () => {
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
       
+      {/* Inject Custom Fonts for Preview (Design View) */}
+      <style>{generateFontCss()}</style>
+
       {/* --- Top Bar --- */}
       <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
@@ -633,89 +771,7 @@ export const DashboardEmailBuilder: React.FC = () => {
 
                       <div className="h-px bg-slate-100 my-4"></div>
 
-                      {/* Sizing & Fit */}
-                      <div className="space-y-3">
-                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ابعاد و نمایش</div>
-                         
-                         <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-xs font-bold text-slate-700 mb-1 block">عرض</label>
-                              <input 
-                                type="text" dir="ltr"
-                                value={selectedBlock.styles.width || '200px'}
-                                onChange={(e) => updateBlockStyle(selectedBlock.id, 'width', e.target.value)}
-                                className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-900"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-bold text-slate-700 mb-1 block">ارتفاع</label>
-                              <input 
-                                type="text" dir="ltr"
-                                value={selectedBlock.styles.height || 'auto'}
-                                onChange={(e) => updateBlockStyle(selectedBlock.id, 'height', e.target.value)}
-                                className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-900"
-                              />
-                            </div>
-                         </div>
-
-                         {selectedBlock.content.sourceType !== 'pattern' && (
-                           <div>
-                             <label className="text-xs font-bold text-slate-700 mb-1 block">نحوه نمایش (Object Fit)</label>
-                             <div className="flex bg-slate-100 p-1 rounded-lg">
-                                {[
-                                  { val: 'contain', icon: Minimize, label: 'Fit' },
-                                  { val: 'cover', icon: Maximize, label: 'Fill' },
-                                  { val: 'fill', icon: ArrowLeftRight, label: 'Stretch' }
-                                ].map((opt) => (
-                                  <button
-                                    key={opt.val}
-                                    onClick={() => handleDisplayModeChange(opt.val as any)}
-                                    className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-md transition-all ${selectedBlock.styles.objectFit === opt.val ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                                    title={opt.label}
-                                  >
-                                    <opt.icon size={14} />
-                                    <span className="text-[9px] font-bold">{opt.label}</span>
-                                  </button>
-                                ))}
-                             </div>
-                           </div>
-                         )}
-                      </div>
-
-                      <div className="h-px bg-slate-100 my-4"></div>
-
-                      {/* Filters */}
-                      <div className="space-y-4">
-                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">فیلترهای تصویر</div>
-                         
-                         <div className="space-y-3">
-                            {[
-                              { label: 'روشنایی', key: 'brightness', icon: Sun },
-                              { label: 'کنتراست', key: 'contrast', icon: BoxSelect },
-                              { label: 'اشباع رنگ', key: 'saturate', icon: Droplet },
-                            ].map((filter) => (
-                              <div key={filter.key}>
-                                 <div className="flex justify-between mb-1">
-                                    <label className="text-[10px] font-bold text-slate-600 flex items-center gap-1">
-                                      <filter.icon size={10} /> {filter.label}
-                                    </label>
-                                    <span className="text-[10px] text-slate-400">{selectedBlock.styles.filter?.[filter.key] || 100}%</span>
-                                 </div>
-                                 <input 
-                                   type="range" 
-                                   min="0" max="200" 
-                                   value={selectedBlock.styles.filter?.[filter.key] || 100}
-                                   onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'filter', filter.key, e.target.value)}
-                                   className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                                 />
-                              </div>
-                            ))}
-                         </div>
-                      </div>
-
-                      <div className="h-px bg-slate-100 my-4"></div>
-
-                      {/* Drop Shadow */}
+                      {/* Drop Shadow for Header */}
                       <div className="space-y-3">
                          <div className="flex items-center justify-between">
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">سایه (PNG)</div>
@@ -732,6 +788,7 @@ export const DashboardEmailBuilder: React.FC = () => {
 
                          {selectedBlock.styles.dropShadow?.enabled && (
                            <div className="bg-slate-50 p-3 rounded-xl space-y-3">
+                              {/* Reuse Header Shadow Controls */}
                               <div className="flex items-center gap-2">
                                  <div className="w-8 h-8 rounded-lg border border-slate-200 overflow-hidden shrink-0">
                                    <input 
@@ -786,7 +843,6 @@ export const DashboardEmailBuilder: React.FC = () => {
                            </div>
                          )}
                       </div>
-
                      </>
                    )}
                    {/* END HEADER SETTINGS */}
@@ -798,26 +854,247 @@ export const DashboardEmailBuilder: React.FC = () => {
                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">محتوا</div>
                         
                         {selectedBlock.type === 'text' && (
-                          <>
+                          <div className="space-y-3">
                              <div>
-                               <label className="text-xs font-bold text-slate-700 mb-1 block">عنوان</label>
-                               <input 
-                                 type="text" 
-                                 value={selectedBlock.content.title}
-                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'title', e.target.value)}
-                                 className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-slate-900"
-                               />
-                             </div>
-                             <div>
-                               <label className="text-xs font-bold text-slate-700 mb-1 block">متن اصلی</label>
+                               <label className="text-xs font-bold text-slate-700 mb-1 block">متن</label>
                                <textarea 
-                                 value={selectedBlock.content.body}
-                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'body', e.target.value)}
+                                 value={selectedBlock.content.text}
+                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'text', e.target.value)}
                                  rows={5}
-                                 className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-slate-900"
+                                 className="w-full p-3 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white text-slate-900 resize-none"
+                                 placeholder="متن خود را اینجا بنویسید..."
                                />
                              </div>
-                          </>
+                             
+                             {/* TEXT SPECIFIC STYLES */}
+                             <div className="pt-2 border-t border-slate-100">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">تایپوگرافی</label>
+                                
+                                <div className="space-y-3">
+                                   <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                         <label className="text-[10px] font-bold text-slate-600 block mb-1">فونت</label>
+                                         <select 
+                                           value={selectedBlock.styles.fontFamily}
+                                           onChange={(e) => updateBlockStyle(selectedBlock.id, 'fontFamily', e.target.value)}
+                                           className="w-full p-1.5 text-xs border border-slate-200 rounded bg-white text-slate-900"
+                                         >
+                                            {CUSTOM_FONTS.map(font => (
+                                              <option key={font.name} value={font.name}>{font.label}</option>
+                                            ))}
+                                         </select>
+                                      </div>
+                                      <div>
+                                         <label className="text-[10px] font-bold text-slate-600 block mb-1">سایز (px)</label>
+                                         <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden relative">
+                                            <button 
+                                                onClick={() => updateBlockStyle(selectedBlock.id, 'fontSize', Math.max(8, parseInt(selectedBlock.styles.fontSize) - 1))}
+                                                className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 text-slate-500 transition-colors border-l border-slate-100"
+                                            >
+                                                <Minus size={14} />
+                                            </button>
+                                            <input 
+                                                type="text" 
+                                                dir="ltr"
+                                                value={selectedBlock.styles.fontSize}
+                                                onChange={(e) => updateBlockStyle(selectedBlock.id, 'fontSize', e.target.value.replace(/[^0-9]/g, ''))}
+                                                className="flex-1 w-full h-8 text-xs text-center border-none focus:ring-0 text-slate-900 font-medium"
+                                            />
+                                            <button 
+                                                onClick={() => updateBlockStyle(selectedBlock.id, 'fontSize', parseInt(selectedBlock.styles.fontSize) + 1)}
+                                                className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 text-slate-500 transition-colors border-r border-slate-100"
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                         </div>
+                                      </div>
+                                   </div>
+
+                                   <div className="flex gap-2">
+                                      <div className="flex-1">
+                                         <label className="text-[10px] font-bold text-slate-600 block mb-1">وزن</label>
+                                         <select 
+                                           value={selectedBlock.styles.fontWeight}
+                                           onChange={(e) => updateBlockStyle(selectedBlock.id, 'fontWeight', e.target.value)}
+                                           className="w-full p-1.5 text-xs border border-slate-200 rounded bg-white text-slate-900"
+                                         >
+                                            <option value="300">نازک (Light)</option>
+                                            <option value="400">عادی (Normal)</option>
+                                            <option value="700">ضخیم (Bold)</option>
+                                            <option value="900">خیلی ضخیم (Heavy)</option>
+                                         </select>
+                                      </div>
+                                      <div className="flex-1">
+                                         <label className="text-[10px] font-bold text-slate-600 block mb-1">ارتفاع خط</label>
+                                         <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden relative">
+                                            <button 
+                                                onClick={() => updateBlockStyle(selectedBlock.id, 'lineHeight', (parseFloat(selectedBlock.styles.lineHeight) - 0.1).toFixed(1))}
+                                                className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 text-slate-500 transition-colors border-l border-slate-100"
+                                            >
+                                                <Minus size={14} />
+                                            </button>
+                                            <input 
+                                                type="text" 
+                                                dir="ltr"
+                                                value={selectedBlock.styles.lineHeight}
+                                                onChange={(e) => updateBlockStyle(selectedBlock.id, 'lineHeight', e.target.value)}
+                                                className="flex-1 w-full h-8 text-xs text-center border-none focus:ring-0 text-slate-900 font-medium"
+                                            />
+                                            <button 
+                                                onClick={() => updateBlockStyle(selectedBlock.id, 'lineHeight', (parseFloat(selectedBlock.styles.lineHeight) + 0.1).toFixed(1))}
+                                                className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 text-slate-500 transition-colors border-r border-slate-100"
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                         </div>
+                                      </div>
+                                   </div>
+
+                                   <div className="flex bg-slate-100 p-1 rounded-lg gap-1">
+                                      <button 
+                                        onClick={() => updateBlockStyle(selectedBlock.id, 'fontWeight', selectedBlock.styles.fontWeight === '700' ? '400' : '700')}
+                                        className={`flex-1 py-1.5 rounded flex items-center justify-center transition-all ${selectedBlock.styles.fontWeight === '700' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                                        title="Bold"
+                                      >
+                                         <Bold size={14} />
+                                      </button>
+                                      <button 
+                                        onClick={() => updateBlockStyle(selectedBlock.id, 'fontStyle', selectedBlock.styles.fontStyle === 'italic' ? 'normal' : 'italic')}
+                                        className={`flex-1 py-1.5 rounded flex items-center justify-center transition-all ${selectedBlock.styles.fontStyle === 'italic' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                                        title="Italic"
+                                      >
+                                         <Italic size={14} />
+                                      </button>
+                                      <button 
+                                        onClick={() => updateBlockStyle(selectedBlock.id, 'textDecoration', selectedBlock.styles.textDecoration === 'underline' ? 'none' : 'underline')}
+                                        className={`flex-1 py-1.5 rounded flex items-center justify-center transition-all ${selectedBlock.styles.textDecoration === 'underline' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                                        title="Underline"
+                                      >
+                                         <UnderlineIcon size={14} />
+                                      </button>
+                                   </div>
+                                </div>
+                             </div>
+
+                             {/* TEXT SHADOW & STROKE */}
+                             <div className="space-y-4 pt-4 border-t border-slate-100">
+                                {/* Stroke */}
+                                <div className="space-y-2">
+                                   <div className="flex items-center justify-between">
+                                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                        <Highlighter size={12} />
+                                        استروک (Stroke)
+                                      </div>
+                                      <label className="relative inline-flex items-center cursor-pointer">
+                                        <input 
+                                          type="checkbox" 
+                                          checked={selectedBlock.styles.stroke?.enabled || false}
+                                          onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'stroke', 'enabled', e.target.checked)}
+                                          className="sr-only peer"
+                                        />
+                                        <div className="w-7 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                      </label>
+                                   </div>
+                                   {selectedBlock.styles.stroke?.enabled && (
+                                      <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                         <div className="w-6 h-6 rounded border border-slate-200 overflow-hidden shrink-0">
+                                            <input 
+                                              type="color" 
+                                              value={selectedBlock.styles.stroke?.color || '#000000'}
+                                              onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'stroke', 'color', e.target.value)}
+                                              className="w-full h-full p-0 border-none cursor-pointer scale-150"
+                                            />
+                                         </div>
+                                         <div className="flex-1 flex items-center gap-2">
+                                            <span className="text-[10px] text-slate-500">ضخامت:</span>
+                                            <input 
+                                              type="range" min="0.5" max="5" step="0.5"
+                                              value={selectedBlock.styles.stroke?.width || 1}
+                                              onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'stroke', 'width', parseFloat(e.target.value))}
+                                              className="flex-1 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                            />
+                                            <span className="text-[10px] text-slate-500 w-4 text-center">{selectedBlock.styles.stroke?.width || 1}</span>
+                                         </div>
+                                      </div>
+                                   )}
+                                </div>
+
+                                {/* Drop Shadow */}
+                                <div className="space-y-3">
+                                   <div className="flex items-center justify-between">
+                                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                        <Layers size={12} />
+                                        سایه متن
+                                      </div>
+                                      <label className="relative inline-flex items-center cursor-pointer">
+                                        <input 
+                                          type="checkbox" 
+                                          checked={selectedBlock.styles.dropShadow?.enabled || false}
+                                          onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'enabled', e.target.checked)}
+                                          className="sr-only peer"
+                                        />
+                                        <div className="w-7 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                      </label>
+                                   </div>
+
+                                   {selectedBlock.styles.dropShadow?.enabled && (
+                                     <div className="bg-slate-50 p-3 rounded-xl space-y-3">
+                                        <div className="flex items-center gap-2">
+                                           <div className="w-8 h-8 rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                                             <input 
+                                               type="color" 
+                                               value={selectedBlock.styles.dropShadow?.color || '#000000'}
+                                               onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'color', e.target.value)}
+                                               className="w-full h-full p-0 border-none cursor-pointer scale-150"
+                                             />
+                                           </div>
+                                           <div className="flex-1 space-y-1">
+                                              <label className="text-[10px] font-bold text-slate-600">محوی (Blur)</label>
+                                              <input 
+                                                type="range" min="0" max="20" 
+                                                value={selectedBlock.styles.dropShadow?.blur || 0}
+                                                onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'blur', e.target.value)}
+                                                className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600"
+                                              />
+                                           </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                           <div>
+                                              <label className="text-[10px] font-bold text-slate-600 block mb-1">افقی X</label>
+                                              <input 
+                                                type="number" 
+                                                value={selectedBlock.styles.dropShadow?.x || 0}
+                                                onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'x', e.target.value)}
+                                                className="w-full p-1 text-center text-xs border border-slate-200 rounded bg-white text-slate-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                              />
+                                           </div>
+                                           <div>
+                                              <label className="text-[10px] font-bold text-slate-600 block mb-1">عمودی Y</label>
+                                              <input 
+                                                type="number" 
+                                                value={selectedBlock.styles.dropShadow?.y || 0}
+                                                onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'y', e.target.value)}
+                                                className="w-full p-1 text-center text-xs border border-slate-200 rounded bg-white text-slate-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                              />
+                                           </div>
+                                        </div>
+                                        <div>
+                                           <div className="flex justify-between items-center mb-1">
+                                              <label className="text-[10px] font-bold text-slate-600 block">شفافیت (Opacity)</label>
+                                              <span className="text-[10px] text-slate-400">{Math.round((selectedBlock.styles.dropShadow?.opacity ?? 0.3) * 100)}%</span>
+                                           </div>
+                                           <input 
+                                             type="range" min="0" max="1" step="0.01"
+                                             value={selectedBlock.styles.dropShadow?.opacity ?? 0.3}
+                                             onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'dropShadow', 'opacity', parseFloat(e.target.value))}
+                                             className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600"
+                                           />
+                                        </div>
+                                     </div>
+                                   )}
+                                </div>
+                             </div>
+                          </div>
                         )}
 
                         {(selectedBlock.type === 'image') && (
@@ -900,13 +1177,15 @@ export const DashboardEmailBuilder: React.FC = () => {
                         <div>
                            <label className="text-xs font-bold text-slate-700 mb-1 block">چیدمان</label>
                            <div className="flex bg-slate-100 p-1 rounded-lg">
-                              {['right', 'center', 'left'].map(align => (
+                              {['right', 'center', 'left', 'justify'].map(align => (
                                  <button
                                    key={align}
                                    onClick={() => updateBlockStyle(selectedBlock.id, 'align', align)}
-                                   className={`flex-1 py-1 rounded flex items-center justify-center ${selectedBlock.styles.align === align ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
+                                   className={`flex-1 py-1 rounded flex items-center justify-center transition-all ${selectedBlock.styles.align === align ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-700'}`}
                                  >
-                                    {align === 'right' ? <AlignRight size={16} /> : align === 'center' ? <AlignCenter size={16} /> : <AlignLeft size={16} />}
+                                    {align === 'right' ? <AlignRight size={16} /> : 
+                                     align === 'center' ? <AlignCenter size={16} /> : 
+                                     align === 'left' ? <AlignLeft size={16} /> : <AlignJustify size={16} />}
                                  </button>
                               ))}
                            </div>

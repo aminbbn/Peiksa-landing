@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Users, Megaphone, BarChart3, Settings, LogOut, Menu, X, Bell, Search, PenTool } from 'lucide-react';
+import { LayoutGrid, Users, Megaphone, BarChart3, Settings, LogOut, Menu, X, Bell, Search, PenTool, FolderOpen } from 'lucide-react';
 import { PageRoute } from '../types';
 
 const menuItems = [
@@ -10,6 +10,7 @@ const menuItems = [
   { label: 'کمپین‌ها', path: PageRoute.DASHBOARD_CAMPAIGNS, icon: Megaphone },
   { label: 'ساخت ایمیل (AI)', path: PageRoute.DASHBOARD_EMAIL_BUILDER, icon: PenTool },
   { label: 'گزارشات', path: PageRoute.DASHBOARD_ANALYTICS, icon: BarChart3 },
+  { label: 'مدیریت فایل‌ها', path: PageRoute.DASHBOARD_FILES, icon: FolderOpen },
   { label: 'تنظیمات', path: PageRoute.DASHBOARD_SETTINGS, icon: Settings },
 ];
 

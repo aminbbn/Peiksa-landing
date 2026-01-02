@@ -1,3 +1,4 @@
+
 import { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -49,6 +50,7 @@ export enum PageRoute {
   DASHBOARD_ANALYTICS = '/dashboard/analytics',
   DASHBOARD_SETTINGS = '/dashboard/settings',
   DASHBOARD_EMAIL_BUILDER = '/dashboard/email-builder',
+  DASHBOARD_FILES = '/dashboard/files',
 }
 
 // Dashboard Types

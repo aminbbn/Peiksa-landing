@@ -11,13 +11,14 @@ import {
   Maximize, Minimize, Crop, ArrowLeftRight, Square, Circle,
   Bold, Italic, Underline as UnderlineIcon, Highlighter, Layers, Box,
   Filter, Smartphone, Laptop, Columns, Wand2, PaintBucket, Hash,
-  ArrowDown, ArrowRight, ArrowDownRight, ArrowLeft, ArrowUpRight, Waves, ChevronDown
+  ArrowDown, ArrowRight, ArrowDownRight, ArrowLeft, ArrowUpRight, Waves, ChevronDown,
+  Timer, Calendar as CalendarIcon, Clock
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 // --- Types ---
 
-type BlockType = 'header' | 'text' | 'button' | 'image' | 'footer' | 'spacer' | 'product-grid';
+type BlockType = 'header' | 'text' | 'button' | 'image' | 'footer' | 'spacer' | 'product-grid' | 'countdown';
 
 interface EmailBlock {
   id: string;
@@ -95,6 +96,27 @@ const getPatternStyle = (settings: GlobalSettings) => {
   }
 };
 
+const calculateTimeLeft = (targetDate: string, targetTime: string) => {
+  const difference = +new Date(`${targetDate}T${targetTime}`) - +new Date();
+  let timeLeft = {
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0
+  };
+
+  if (difference > 0) {
+    timeLeft = {
+      days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+      hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+      minutes: Math.floor((difference / 1000 / 60) % 60),
+      seconds: Math.floor((difference / 1000) % 60)
+    };
+  }
+
+  return timeLeft;
+};
+
 // --- Constants & Data ---
 
 const ICON_MAP: Record<string, string | null> = {
@@ -135,6 +157,14 @@ const BUTTON_PRESETS = [
   { name: 'مینیمال', styles: { buttonBackgroundColor: '#f1f5f9', textColor: '#64748b', borderRadius: '6px', border: { enabled: false }, buttonGradient: { enabled: false }, dropShadow: { ...defaultDropShadow }, buttonPadding: '10px 24px' } },
   { name: 'غروب', styles: { buttonBackgroundColor: '#f97316', textColor: '#ffffff', borderRadius: '12px', border: { enabled: false }, buttonGradient: { enabled: true, from: '#f97316', to: '#fbbf24', direction: 'to bottom right' }, dropShadow: { enabled: true, color: '#f97316', blur: 8, x: 0, y: 4, opacity: 0.3 }, buttonPadding: '14px 36px' } },
   { name: 'سایبر', styles: { buttonBackgroundColor: '#000000', textColor: '#06b6d4', borderRadius: '2px', border: { enabled: true, color: '#06b6d4', width: 1, style: 'solid' }, buttonGradient: { enabled: false }, dropShadow: { enabled: true, color: '#06b6d4', blur: 0, x: -3, y: 3, opacity: 1 }, buttonPadding: '12px 32px' } },
+];
+
+const COUNTDOWN_PRESETS = [
+  { name: 'روشن', styles: { digitColor: '#1e293b', digitBgColor: '#f1f5f9', labelColor: '#64748b', borderRadius: '8', fontSize: '24' } },
+  { name: 'تیره', styles: { digitColor: '#ffffff', digitBgColor: '#0f172a', labelColor: '#94a3b8', borderRadius: '8', fontSize: '24' } },
+  { name: 'آبی', styles: { digitColor: '#ffffff', digitBgColor: '#3b82f6', labelColor: '#60a5fa', borderRadius: '12', fontSize: '24' } },
+  { name: 'قرمز', styles: { digitColor: '#ffffff', digitBgColor: '#ef4444', labelColor: '#f87171', borderRadius: '12', fontSize: '24' } },
+  { name: 'مینیمال', styles: { digitColor: '#0f172a', digitBgColor: 'transparent', labelColor: '#64748b', borderRadius: '0', fontSize: '32', border: { enabled: true, color: '#e2e8f0', width: 2 } } },
 ];
 
 const CUSTOM_FONTS = [
@@ -427,6 +457,29 @@ const defaultBlocks: Record<BlockType, Omit<EmailBlock, 'id'>> = {
       textPadding: '12px 0 0 0', // top right bottom left
     }
   },
+  countdown: {
+    type: 'countdown',
+    content: {
+      targetDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], // 3 days from now
+      targetTime: '23:59',
+      timezone: 'Asia/Tehran'
+    },
+    styles: {
+      backgroundColor: '#ffffff',
+      padding: '30px',
+      align: 'center',
+      digitColor: '#1e293b',
+      digitBgColor: '#f1f5f9',
+      labelColor: '#64748b',
+      fontSize: '24',
+      borderRadius: '8px',
+      boxPadding: '10', // Inner padding of boxes
+      gap: '10', // Gap between boxes
+      fontFamily: 'Vazirmatn',
+      border: { enabled: false, color: '#e2e8f0', width: 1 },
+      dropShadow: { ...defaultDropShadow }
+    }
+  },
   footer: {
     type: 'footer',
     content: { text: '© ۱۴۰۳ تمامی حقوق محفوظ است.', unsubscribeText: 'لغو اشتراک', unsubscribeLink: '#', link: '' },
@@ -692,6 +745,44 @@ const generateHtmlFromBlocks = (blocks: EmailBlock[], globalSettings?: GlobalSet
           </div>
         `;
 
+      case 'countdown':
+        const timeLeft = calculateTimeLeft(content.targetDate, content.targetTime);
+        const { days, hours, minutes, seconds } = timeLeft;
+        const boxPadding = styles.boxPadding || '10';
+        const digitStyle = `display: inline-block; width: 60px; padding: ${boxPadding}px 0; background-color: ${styles.digitBgColor}; color: ${styles.digitColor}; border-radius: ${styles.borderRadius}px; font-size: ${styles.fontSize}px; font-weight: bold; font-family: '${styles.fontFamily}', sans-serif; text-align: center;`;
+        const labelStyle = `display: block; font-size: 10px; color: ${styles.labelColor}; margin-top: 4px; font-family: '${styles.fontFamily}', sans-serif; text-align: center;`;
+        
+        return `
+          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: ${styles.align}; direction: ltr;">
+             <!--[if mso]>
+             <table role="presentation" align="${styles.align === 'center' ? 'center' : styles.align === 'left' ? 'left' : 'right'}" border="0" cellspacing="0" cellpadding="0">
+             <tr>
+             <![endif]-->
+             
+             <div style="display: inline-block; margin: 0 ${styles.gap ? parseInt(styles.gap) / 2 : 5}px;">
+                <div style="${digitStyle}">${days}</div>
+                <div style="${labelStyle}">روز</div>
+             </div>
+             <div style="display: inline-block; margin: 0 ${styles.gap ? parseInt(styles.gap) / 2 : 5}px;">
+                <div style="${digitStyle}">${hours}</div>
+                <div style="${labelStyle}">ساعت</div>
+             </div>
+             <div style="display: inline-block; margin: 0 ${styles.gap ? parseInt(styles.gap) / 2 : 5}px;">
+                <div style="${digitStyle}">${minutes}</div>
+                <div style="${labelStyle}">دقیقه</div>
+             </div>
+             <div style="display: inline-block; margin: 0 ${styles.gap ? parseInt(styles.gap) / 2 : 5}px;">
+                <div style="${digitStyle}">${seconds}</div>
+                <div style="${labelStyle}">ثانیه</div>
+             </div>
+
+             <!--[if mso]>
+             </tr>
+             </table>
+             <![endif]-->
+          </div>
+        `;
+
       case 'footer':
         const fFont = styles.fontFamily || 'Vazirmatn';
         const fSize = styles.fontSize || '14';
@@ -750,6 +841,66 @@ const generateHtmlFromBlocks = (blocks: EmailBlock[], globalSettings?: GlobalSet
   </div>
 </body>
 </html>`;
+};
+
+// --- Preview Component for Countdown ---
+const CountdownPreview: React.FC<{ 
+  targetDate: string; 
+  targetTime: string; 
+  styles: any; 
+}> = ({ targetDate, targetTime, styles }) => {
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft(targetDate, targetTime));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft(targetDate, targetTime));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate, targetTime]);
+
+  const boxPadding = styles.boxPadding || 10;
+
+  return (
+    <div style={{ backgroundColor: styles.backgroundColor, padding: styles.padding, textAlign: styles.align as any, direction: 'ltr' }}>
+      <div style={{ display: 'inline-flex', gap: `${styles.gap}px` }}>
+        {[
+          { label: 'Days', value: timeLeft.days, unit: 'روز' },
+          { label: 'Hours', value: timeLeft.hours, unit: 'ساعت' },
+          { label: 'Minutes', value: timeLeft.minutes, unit: 'دقیقه' },
+          { label: 'Seconds', value: timeLeft.seconds, unit: 'ثانیه' },
+        ].map((item, idx) => (
+          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{
+              width: '60px',
+              padding: `${boxPadding}px 0`,
+              backgroundColor: styles.digitBgColor,
+              color: styles.digitColor,
+              borderRadius: `${styles.borderRadius}px`,
+              fontSize: `${styles.fontSize}px`,
+              fontWeight: 'bold',
+              fontFamily: styles.fontFamily,
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: styles.border?.enabled ? `${styles.border.width}px solid ${styles.border.color}` : 'none',
+              boxShadow: styles.dropShadow?.enabled ? `${styles.dropShadow.x}px ${styles.dropShadow.y}px ${styles.dropShadow.blur}px ${hexToRgba(styles.dropShadow.color, styles.dropShadow.opacity)}` : 'none',
+            }}>
+              {String(item.value).padStart(2, '0')}
+            </div>
+            <div style={{
+              marginTop: '4px',
+              fontSize: '10px',
+              color: styles.labelColor,
+              fontFamily: styles.fontFamily,
+            }}>
+              {item.unit}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 
@@ -1349,6 +1500,176 @@ export const DashboardEmailBuilder: React.FC = () => {
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                    {/* ... (Existing Block Settings Logic) ... */}
+                   {/* COUNTDOWN SETTINGS */}
+                   {selectedBlock.type === 'countdown' && (
+                     <div className="space-y-6">
+                       {/* 1. Target Time Section */}
+                       <div className="space-y-3">
+                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">زمان هدف</div>
+                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
+                           <div>
+                             <label className="text-[10px] font-bold text-slate-600 block mb-1">تاریخ</label>
+                             <div className="relative">
+                               <input 
+                                 type="date" 
+                                 value={selectedBlock.content.targetDate}
+                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'targetDate', e.target.value)}
+                                 className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
+                               />
+                               <CalendarIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                             </div>
+                           </div>
+                           <div className="h-px bg-slate-200 w-full"></div>
+                           <div>
+                             <label className="text-[10px] font-bold text-slate-600 block mb-1">ساعت</label>
+                             <div className="relative">
+                               <input 
+                                 type="time" 
+                                 value={selectedBlock.content.targetTime}
+                                 onChange={(e) => updateBlockContent(selectedBlock.id, 'targetTime', e.target.value)}
+                                 className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
+                               />
+                               <Clock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+
+                       {/* 2. Presets Section */}
+                       <div className="space-y-3">
+                          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">استایل‌های آماده</div>
+                          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                             {COUNTDOWN_PRESETS.map((preset, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => applyPreset(selectedBlock.id, preset.styles)}
+                                  className="flex flex-col items-center gap-1 min-w-[50px] group"
+                                >
+                                   <div 
+                                     className="w-10 h-10 rounded-lg border border-slate-200 shadow-sm flex items-center justify-center transition-all group-hover:ring-2 group-hover:ring-blue-500 group-hover:scale-105"
+                                     style={{ backgroundColor: preset.styles.digitBgColor === 'transparent' ? '#f8fafc' : preset.styles.digitBgColor }}
+                                   >
+                                      <span style={{ color: preset.styles.digitColor }} className="font-bold text-xs">00</span>
+                                   </div>
+                                   <span className="text-[9px] text-slate-500">{preset.name}</span>
+                                </button>
+                             ))}
+                          </div>
+                       </div>
+
+                       <div className="h-px bg-slate-100"></div>
+
+                       {/* 3. Colors Section */}
+                       <div className="space-y-3">
+                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">رنگ‌ها</div>
+                         <div className="grid grid-cols-3 gap-2">
+                            {/* Digit Color */}
+                            <div className="flex flex-col items-center gap-1.5">
+                               <div className="relative w-8 h-8 rounded-full border border-slate-200 overflow-hidden shadow-sm hover:scale-110 transition-transform">
+                                  <input 
+                                    type="color" 
+                                    value={selectedBlock.styles.digitColor}
+                                    onChange={(e) => updateBlockStyle(selectedBlock.id, 'digitColor', e.target.value)}
+                                    className="absolute -top-4 -left-4 w-16 h-16 cursor-pointer p-0 border-none"
+                                  />
+                               </div>
+                               <span className="text-[9px] text-slate-500">اعداد</span>
+                            </div>
+                            
+                            {/* Box Bg Color */}
+                            <div className="flex flex-col items-center gap-1.5">
+                               <div className="relative w-8 h-8 rounded-full border border-slate-200 overflow-hidden shadow-sm hover:scale-110 transition-transform">
+                                  <input 
+                                    type="color" 
+                                    value={selectedBlock.styles.digitBgColor}
+                                    onChange={(e) => updateBlockStyle(selectedBlock.id, 'digitBgColor', e.target.value)}
+                                    className="absolute -top-4 -left-4 w-16 h-16 cursor-pointer p-0 border-none"
+                                  />
+                               </div>
+                               <span className="text-[9px] text-slate-500">پس‌زمینه باکس</span>
+                            </div>
+
+                            {/* Label Color */}
+                            <div className="flex flex-col items-center gap-1.5">
+                               <div className="relative w-8 h-8 rounded-full border border-slate-200 overflow-hidden shadow-sm hover:scale-110 transition-transform">
+                                  <input 
+                                    type="color" 
+                                    value={selectedBlock.styles.labelColor}
+                                    onChange={(e) => updateBlockStyle(selectedBlock.id, 'labelColor', e.target.value)}
+                                    className="absolute -top-4 -left-4 w-16 h-16 cursor-pointer p-0 border-none"
+                                  />
+                               </div>
+                               <span className="text-[9px] text-slate-500">برچسب‌ها</span>
+                            </div>
+                         </div>
+                       </div>
+
+                       <div className="h-px bg-slate-100"></div>
+
+                       {/* 4. Dimensions Section */}
+                       <div className="space-y-4">
+                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">ابعاد و فاصله</div>
+                         <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+                            {/* Font Size */}
+                            <div className="space-y-1">
+                               <div className="flex justify-between items-center">
+                                  <label className="text-[10px] font-bold text-slate-600">سایز فونت</label>
+                                  <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 rounded">{selectedBlock.styles.fontSize}px</span>
+                               </div>
+                               <input 
+                                  type="range" min="12" max="64" step="1"
+                                  value={parseInt(selectedBlock.styles.fontSize)}
+                                  onChange={(e) => updateBlockStyle(selectedBlock.id, 'fontSize', e.target.value)}
+                                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                               />
+                            </div>
+
+                            {/* Box Radius */}
+                            <div className="space-y-1">
+                               <div className="flex justify-between items-center">
+                                  <label className="text-[10px] font-bold text-slate-600">گردی باکس</label>
+                                  <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 rounded">{selectedBlock.styles.borderRadius}px</span>
+                               </div>
+                               <input 
+                                  type="range" min="0" max="30" step="1"
+                                  value={parseInt(selectedBlock.styles.borderRadius)}
+                                  onChange={(e) => updateBlockStyle(selectedBlock.id, 'borderRadius', e.target.value)}
+                                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                               />
+                            </div>
+
+                            {/* Box Padding (Height) */}
+                            <div className="space-y-1">
+                               <div className="flex justify-between items-center">
+                                  <label className="text-[10px] font-bold text-slate-600">ارتفاع باکس</label>
+                                  <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 rounded">{selectedBlock.styles.boxPadding || 10}px</span>
+                               </div>
+                               <input 
+                                  type="range" min="0" max="40" step="1"
+                                  value={parseInt(selectedBlock.styles.boxPadding || 10)}
+                                  onChange={(e) => updateBlockStyle(selectedBlock.id, 'boxPadding', e.target.value)}
+                                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                               />
+                            </div>
+
+                            {/* Gap */}
+                            <div className="space-y-1">
+                               <div className="flex justify-between items-center">
+                                  <label className="text-[10px] font-bold text-slate-600">فاصله بین</label>
+                                  <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 rounded">{selectedBlock.styles.gap || 10}px</span>
+                               </div>
+                               <input 
+                                  type="range" min="0" max="40" step="1"
+                                  value={parseInt(selectedBlock.styles.gap || 10)}
+                                  onChange={(e) => updateBlockStyle(selectedBlock.id, 'gap', e.target.value)}
+                                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                               />
+                            </div>
+                         </div>
+                       </div>
+                     </div>
+                   )}
+
                    {/* BUTTON SETTINGS */}
                    {selectedBlock.type === 'button' && (
                      /* ... (Button Settings Code - Kept Same) ... */
@@ -2405,7 +2726,7 @@ export const DashboardEmailBuilder: React.FC = () => {
 
 
                    {/* COMMON CONTENT FIELDS (Non-Header & Non-Button & Non-Image & Non-Grid & Non-Footer) */}
-                   {selectedBlock.type !== 'header' && selectedBlock.type !== 'button' && selectedBlock.type !== 'image' && selectedBlock.type !== 'product-grid' && selectedBlock.type !== 'footer' && (
+                   {selectedBlock.type !== 'header' && selectedBlock.type !== 'button' && selectedBlock.type !== 'image' && selectedBlock.type !== 'product-grid' && selectedBlock.type !== 'footer' && selectedBlock.type !== 'countdown' && (
                      <div className="space-y-4">
                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">محتوا</div>
                         
@@ -2846,7 +3167,15 @@ export const DashboardEmailBuilder: React.FC = () => {
                                      </div>
 
                                      {/* Render Block Content (Simplified Preview) */}
-                                     <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: generateHtmlFromBlocks([block]).match(/<div class="email-container"[^>]*>([\s\S]*)<\/div>\s*<\/body>/)?.[1] || '' }} />
+                                     {block.type === 'countdown' ? (
+                                        <CountdownPreview 
+                                          targetDate={block.content.targetDate} 
+                                          targetTime={block.content.targetTime}
+                                          styles={block.styles}
+                                        />
+                                     ) : (
+                                        <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: generateHtmlFromBlocks([block]).match(/<div class="email-container"[^>]*>([\s\S]*)<\/div>\s*<\/body>/)?.[1] || '' }} />
+                                     )}
                                   </div>
                                </Reorder.Item>
                             ))}
@@ -2874,6 +3203,7 @@ export const DashboardEmailBuilder: React.FC = () => {
                 { type: 'button', label: 'دکمه', icon: MousePointer2 },
                 { type: 'image', label: 'تصویر', icon: ImageIcon },
                 { type: 'product-grid', label: 'کارت‌لیست', icon: Grid },
+                { type: 'countdown', label: 'شمارش معکوس', icon: Timer },
                 { type: 'spacer', label: 'فاصله', icon: GripVertical },
                 { type: 'footer', label: 'پاورقی', icon: Globe },
               ].map((item) => (

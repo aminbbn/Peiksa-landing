@@ -10,7 +10,7 @@ import {
   MoveUp, MoveDown, Settings, Globe, Sliders, BoxSelect, Sun, Droplet, Monitor, Grid,
   Maximize, Minimize, Crop, ArrowLeftRight, Square, Circle,
   Bold, Italic, Underline as UnderlineIcon, Highlighter, Layers, Box,
-  Filter, Smartphone, Laptop, Columns
+  Filter, Smartphone, Laptop, Columns, Share2
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -93,6 +93,13 @@ const BUTTON_PRESETS = [
   { name: 'مینیمال', styles: { buttonBackgroundColor: '#f1f5f9', textColor: '#64748b', borderRadius: '6px', border: { enabled: false }, buttonGradient: { enabled: false }, dropShadow: { ...defaultDropShadow }, buttonPadding: '10px 24px' } },
   { name: 'غروب', styles: { buttonBackgroundColor: '#f97316', textColor: '#ffffff', borderRadius: '12px', border: { enabled: false }, buttonGradient: { enabled: true, from: '#f97316', to: '#fbbf24', direction: 'to bottom right' }, dropShadow: { enabled: true, color: '#f97316', blur: 8, x: 0, y: 4, opacity: 0.3 }, buttonPadding: '14px 36px' } },
   { name: 'سایبر', styles: { buttonBackgroundColor: '#000000', textColor: '#06b6d4', borderRadius: '2px', border: { enabled: true, color: '#06b6d4', width: 1, style: 'solid' }, buttonGradient: { enabled: false }, dropShadow: { enabled: true, color: '#06b6d4', blur: 0, x: -3, y: 3, opacity: 1 }, buttonPadding: '12px 32px' } },
+];
+
+const FOOTER_PRESETS = [
+  { name: 'ساده', styles: { backgroundColor: '#f1f5f9', color: '#64748b', align: 'center', borderTop: { enabled: false } }, content: { socials: [] } },
+  { name: 'تیره', styles: { backgroundColor: '#1e293b', color: '#94a3b8', align: 'center', borderTop: { enabled: false } }, content: { socials: [] } },
+  { name: 'با سوشال', styles: { backgroundColor: '#ffffff', color: '#475569', align: 'center', borderTop: { enabled: true, color: '#e2e8f0', width: 1 } }, content: { socials: [{ icon: 'instagram', link: '#' }, { icon: 'linkedin', link: '#' }, { icon: 'twitter', link: '#' }] } },
+  { name: 'مینیمال', styles: { backgroundColor: '#ffffff', color: '#cbd5e1', align: 'left', borderTop: { enabled: false } }, content: { socials: [] } },
 ];
 
 const CUSTOM_FONTS = [
@@ -387,8 +394,21 @@ const defaultBlocks: Record<BlockType, Omit<EmailBlock, 'id'>> = {
   },
   footer: {
     type: 'footer',
-    content: { text: '© ۱۴۰۳ تمامی حقوق محفوظ است.', unsubscribeText: 'لغو اشتراک', unsubscribeLink: '#', link: '' },
-    styles: { backgroundColor: '#f1f5f9', color: '#64748b', padding: '32px' }
+    content: {
+      text: '© ۱۴۰۳ تمامی حقوق محفوظ است.',
+      unsubscribeText: 'لغو اشتراک',
+      unsubscribeLink: '#',
+      link: '',
+      socials: [] // Array of { icon: string, link: string }
+    },
+    styles: {
+      backgroundColor: '#f1f5f9',
+      color: '#64748b',
+      padding: '32px',
+      align: 'center',
+      borderTop: { enabled: false, color: '#e2e8f0', width: 1 },
+      socialIconColor: '#94a3b8'
+    }
   },
   spacer: {
     type: 'spacer',
@@ -631,11 +651,27 @@ const generateHtmlFromBlocks = (blocks: EmailBlock[]) => {
         `;
 
       case 'footer':
-        const footerText = `<p style="margin: 0 0 12px 0; color: ${styles.color}; font-size: 14px; font-family: 'Vazirmatn', sans-serif;">${content.text}</p>`;
+        const footerSocials = content.socials && content.socials.length > 0 ? `
+          <div style="margin-bottom: 20px;">
+            ${content.socials.map((s: any) => `
+              <a href="${s.link}" target="_blank" style="display: inline-block; margin: 0 8px; text-decoration: none; color: ${styles.socialIconColor || styles.color};">
+                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                   ${ICON_MAP[s.icon] || ''}
+                 </svg>
+              </a>
+            `).join('')}
+          </div>
+        ` : '';
+
+        const borderStyle = styles.borderTop?.enabled ? `border-top: ${styles.borderTop.width}px solid ${styles.borderTop.color};` : '';
+
         return `
-          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: center; direction: rtl;">
-            ${content.link ? `<a href="${content.link}" style="text-decoration: none; display: block; color: inherit;">${footerText}</a>` : footerText}
-            <a href="${content.unsubscribeLink}" style="color: ${styles.color}; text-decoration: underline; font-size: 12px; font-family: 'Vazirmatn', sans-serif;">${content.unsubscribeText}</a>
+          <div style="background-color: ${styles.backgroundColor}; padding: ${styles.padding}; text-align: ${styles.align || 'center'}; direction: rtl; ${borderStyle}">
+            ${footerSocials}
+            <p style="margin: 0 0 12px 0; color: ${styles.color}; font-size: 14px; font-family: 'Vazirmatn', sans-serif;">${content.text}</p>
+            <div style="margin-top: 12px;">
+               <a href="${content.unsubscribeLink}" style="color: ${styles.color}; text-decoration: underline; font-size: 12px; opacity: 0.8; font-family: 'Vazirmatn', sans-serif;">${content.unsubscribeText}</a>
+            </div>
           </div>`;
 
       case 'spacer':
@@ -771,16 +807,41 @@ export const DashboardEmailBuilder: React.FC = () => {
     });
   };
 
-  const applyPreset = (id: string, presetStyles: any) => {
+  // Footer Socials
+  const addFooterSocial = (blockId: string) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const newSocials = [...(block.content.socials || []), { icon: 'instagram', link: '#' }];
+    updateBlockContent(blockId, 'socials', newSocials);
+  };
+
+  const removeFooterSocial = (blockId: string, index: number) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const newSocials = [...block.content.socials];
+    newSocials.splice(index, 1);
+    updateBlockContent(blockId, 'socials', newSocials);
+  };
+
+  const updateFooterSocial = (blockId: string, index: number, field: string, value: any) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const newSocials = [...block.content.socials];
+    newSocials[index] = { ...newSocials[index], [field]: value };
+    updateBlockContent(blockId, 'socials', newSocials);
+  };
+
+  const applyPreset = (id: string, presetStyles: any, presetContent?: any) => {
     setBlocks(blocks.map(b => {
       if (b.id !== id) return b;
       return {
         ...b,
+        content: presetContent ? { ...b.content, ...presetContent } : b.content,
         styles: {
           ...b.styles,
           ...presetStyles,
-          backgroundColor: b.styles.backgroundColor,
-          align: b.styles.align,
+          backgroundColor: presetStyles.backgroundColor || b.styles.backgroundColor,
+          align: presetStyles.align || b.styles.align,
           padding: b.styles.padding,
         }
       };
@@ -910,6 +971,8 @@ export const DashboardEmailBuilder: React.FC = () => {
 
   // Tab State for Product Grid Settings
   const [gridTab, setGridTab] = useState<'layout' | 'items' | 'imgStyle' | 'txtStyle'>('layout');
+  // Tab State for Footer Settings
+  const [footerTab, setFooterTab] = useState<'content' | 'appearance'>('content');
 
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
@@ -981,6 +1044,230 @@ export const DashboardEmailBuilder: React.FC = () => {
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                    
+                   {/* FOOTER SETTINGS (NEW) */}
+                   {selectedBlock.type === 'footer' && (
+                     <div className="space-y-6">
+                        {/* Presets */}
+                        <div className="space-y-2">
+                           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">استایل‌های آماده</div>
+                           <div className="grid grid-cols-2 gap-2 p-1">
+                              {FOOTER_PRESETS.map((preset, idx) => (
+                                 <button
+                                   key={idx}
+                                   onClick={() => applyPreset(selectedBlock.id, preset.styles, preset.content)}
+                                   className="text-xs py-2 px-3 rounded-lg border border-slate-200 bg-white hover:border-blue-300 hover:text-blue-600 hover:shadow-md transition-all text-center text-slate-700 font-medium truncate"
+                                 >
+                                    {preset.name}
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
+
+                        {/* Footer Tabs */}
+                        <div className="flex bg-slate-100 p-1 rounded-lg">
+                           <button 
+                             onClick={() => setFooterTab('content')}
+                             className={`flex-1 py-1.5 text-[10px] font-bold rounded-md flex items-center justify-center gap-2 transition-all ${footerTab === 'content' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                           >
+                             <Type size={12} />
+                             محتوا
+                           </button>
+                           <button 
+                             onClick={() => setFooterTab('appearance')}
+                             className={`flex-1 py-1.5 text-[10px] font-bold rounded-md flex items-center justify-center gap-2 transition-all ${footerTab === 'appearance' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                           >
+                             <Palette size={12} />
+                             ظاهر
+                           </button>
+                        </div>
+
+                        {footerTab === 'content' && (
+                           <div className="space-y-4">
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-600 block mb-1">متن کپی‌رایت</label>
+                                 <input 
+                                   type="text" 
+                                   value={selectedBlock.content.text}
+                                   onChange={(e) => updateBlockContent(selectedBlock.id, 'text', e.target.value)}
+                                   className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-900"
+                                 />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                 <div>
+                                    <label className="text-[10px] font-bold text-slate-600 block mb-1">متن لغو اشتراک</label>
+                                    <input 
+                                      type="text" 
+                                      value={selectedBlock.content.unsubscribeText}
+                                      onChange={(e) => updateBlockContent(selectedBlock.id, 'unsubscribeText', e.target.value)}
+                                      className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-900"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="text-[10px] font-bold text-slate-600 block mb-1">لینک لغو اشتراک</label>
+                                    <input 
+                                      type="text" dir="ltr"
+                                      value={selectedBlock.content.unsubscribeLink}
+                                      onChange={(e) => updateBlockContent(selectedBlock.id, 'unsubscribeLink', e.target.value)}
+                                      className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-900"
+                                    />
+                                 </div>
+                              </div>
+
+                              {/* Social Media Manager */}
+                              <div className="pt-2 border-t border-slate-100">
+                                 <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] font-bold text-slate-600">شبکه‌های اجتماعی</label>
+                                    <button onClick={() => addFooterSocial(selectedBlock.id)} className="text-[10px] text-blue-600 hover:bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
+                                       <Plus size={12} /> افزودن
+                                    </button>
+                                 </div>
+                                 <div className="space-y-2">
+                                    {selectedBlock.content.socials?.map((social: any, idx: number) => (
+                                       <div key={idx} className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                          <div className="relative group">
+                                             <div className="w-8 h-8 bg-white border border-slate-200 rounded flex items-center justify-center text-slate-600">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: ICON_MAP[social.icon] || '' }} />
+                                             </div>
+                                             {/* Icon Selector Popup (Simplified) */}
+                                             <select 
+                                                value={social.icon}
+                                                onChange={(e) => updateFooterSocial(selectedBlock.id, idx, 'icon', e.target.value)}
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                             >
+                                                {Object.keys(ICON_MAP).filter(k => k !== 'none').map(k => (
+                                                   <option key={k} value={k}>{k}</option>
+                                                ))}
+                                             </select>
+                                          </div>
+                                          <input 
+                                             type="text" dir="ltr"
+                                             value={social.link}
+                                             onChange={(e) => updateFooterSocial(selectedBlock.id, idx, 'link', e.target.value)}
+                                             placeholder="https://"
+                                             className="flex-1 p-1.5 text-xs border border-slate-200 rounded bg-white text-slate-900"
+                                          />
+                                          <button onClick={() => removeFooterSocial(selectedBlock.id, idx)} className="text-red-500 hover:bg-red-50 p-1.5 rounded">
+                                             <Trash2 size={14} />
+                                          </button>
+                                       </div>
+                                    ))}
+                                    {(!selectedBlock.content.socials || selectedBlock.content.socials.length === 0) && (
+                                       <p className="text-[10px] text-slate-400 text-center py-2">هنوز شبکه‌ای اضافه نکرده‌اید.</p>
+                                    )}
+                                 </div>
+                              </div>
+                           </div>
+                        )}
+
+                        {footerTab === 'appearance' && (
+                           <div className="space-y-4">
+                              {/* Background & Text Color */}
+                              <div className="grid grid-cols-2 gap-2">
+                                 <div>
+                                    <label className="text-[10px] font-bold text-slate-600 block mb-1">پس‌زمینه</label>
+                                    <div className="flex items-center gap-2 border border-slate-200 rounded-lg p-1 bg-slate-50">
+                                       <input 
+                                          type="color" 
+                                          value={selectedBlock.styles.backgroundColor}
+                                          onChange={(e) => updateBlockStyle(selectedBlock.id, 'backgroundColor', e.target.value)}
+                                          className="w-6 h-6 rounded cursor-pointer border-none p-0"
+                                       />
+                                       <span className="text-[10px] text-slate-500 font-mono" dir="ltr">{selectedBlock.styles.backgroundColor}</span>
+                                    </div>
+                                 </div>
+                                 <div>
+                                    <label className="text-[10px] font-bold text-slate-600 block mb-1">رنگ متن</label>
+                                    <div className="flex items-center gap-2 border border-slate-200 rounded-lg p-1 bg-slate-50">
+                                       <input 
+                                          type="color" 
+                                          value={selectedBlock.styles.color}
+                                          onChange={(e) => updateBlockStyle(selectedBlock.id, 'color', e.target.value)}
+                                          className="w-6 h-6 rounded cursor-pointer border-none p-0"
+                                       />
+                                    </div>
+                                 </div>
+                              </div>
+
+                              {/* Social Icon Color */}
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-600 block mb-1">رنگ آیکون‌های اجتماعی</label>
+                                 <div className="flex items-center gap-2 border border-slate-200 rounded-lg p-1 bg-slate-50">
+                                    <input 
+                                       type="color" 
+                                       value={selectedBlock.styles.socialIconColor || '#94a3b8'}
+                                       onChange={(e) => updateBlockStyle(selectedBlock.id, 'socialIconColor', e.target.value)}
+                                       className="w-6 h-6 rounded cursor-pointer border-none p-0"
+                                    />
+                                    <span className="text-[10px] text-slate-500 font-mono" dir="ltr">{selectedBlock.styles.socialIconColor}</span>
+                                 </div>
+                              </div>
+
+                              {/* Alignment */}
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-600 block mb-1">چیدمان</label>
+                                 <div className="flex bg-slate-100 p-1 rounded-lg">
+                                    {['right', 'center', 'left'].map(align => (
+                                       <button 
+                                          key={align}
+                                          onClick={() => updateBlockStyle(selectedBlock.id, 'align', align)}
+                                          className={`flex-1 py-1 rounded flex items-center justify-center transition-all ${selectedBlock.styles.align === align ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
+                                       >
+                                          {align === 'right' ? <AlignRight size={16} /> : align === 'center' ? <AlignCenter size={16} /> : <AlignLeft size={16} />}
+                                       </button>
+                                    ))}
+                                 </div>
+                              </div>
+
+                              {/* Padding */}
+                              <div>
+                                 <div className="flex justify-between items-center mb-1">
+                                    <label className="text-[10px] font-bold text-slate-600">فاصله داخلی (Padding)</label>
+                                    <span className="text-[10px] text-slate-400">{selectedBlock.styles.padding}</span>
+                                 </div>
+                                 <input 
+                                   type="range" min="0" max="60" step="4"
+                                   value={parseInt(selectedBlock.styles.padding)}
+                                   onChange={(e) => updateBlockStyle(selectedBlock.id, 'padding', `${e.target.value}px`)}
+                                   className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                 />
+                              </div>
+
+                              {/* Top Border */}
+                              <div className="pt-2 border-t border-slate-100">
+                                 <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] font-bold text-slate-600">خط جداکننده بالا</label>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                       <input 
+                                          type="checkbox" 
+                                          checked={selectedBlock.styles.borderTop?.enabled || false}
+                                          onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'borderTop', 'enabled', e.target.checked)}
+                                          className="sr-only peer"
+                                       />
+                                       <div className="w-7 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                    </label>
+                                 </div>
+                                 {selectedBlock.styles.borderTop?.enabled && (
+                                    <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                       <input 
+                                          type="color" 
+                                          value={selectedBlock.styles.borderTop?.color || '#e2e8f0'}
+                                          onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'borderTop', 'color', e.target.value)}
+                                          className="w-6 h-6 rounded cursor-pointer border-none p-0 bg-transparent"
+                                       />
+                                       <input 
+                                          type="number" min="1" max="10"
+                                          value={selectedBlock.styles.borderTop?.width || 1}
+                                          onChange={(e) => updateBlockNestedStyle(selectedBlock.id, 'borderTop', 'width', parseInt(e.target.value))}
+                                          className="w-12 text-xs p-1 rounded border border-slate-200 text-center bg-white text-slate-900"
+                                       />
+                                    </div>
+                                 )}
+                              </div>
+                           </div>
+                        )}
+                     </div>
+                   )}
+
                    {/* BUTTON SETTINGS */}
                    {selectedBlock.type === 'button' && (
                      /* ... (Button Settings Code - Kept Same) ... */

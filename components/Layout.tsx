@@ -19,7 +19,7 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      setIsScrolled(window.scrollY > 10);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
@@ -31,11 +31,13 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
   }, [location]);
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-slate-50 text-slate-900">
+    <div className="min-h-screen flex flex-col font-sans text-slate-900">
       {/* Navbar */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled ? 'bg-white/90 backdrop-blur-md shadow-sm py-3' : 'bg-transparent py-5'
+          isScrolled 
+            ? 'bg-white/80 backdrop-blur-xl shadow-sm border-b border-white/20 py-3' 
+            : 'bg-transparent py-5'
         }`}
       >
         <div className="container mx-auto px-4 md:px-6">
@@ -47,7 +49,7 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
                 alt="Peiksa Logo" 
                 className="w-10 h-10 object-contain transition-transform group-hover:scale-110"
               />
-              <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500">
+              <span className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500">
                 پیکسا
               </span>
             </Link>
@@ -58,11 +60,17 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+                  className={`text-sm font-medium transition-colors hover:text-blue-600 relative py-1 ${
                     location.pathname === item.path ? 'text-blue-600' : 'text-slate-600'
                   }`}
                 >
                   {item.label}
+                  {location.pathname === item.path && (
+                    <motion.div 
+                      layoutId="navbar-indicator"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full"
+                    />
+                  )}
                 </Link>
               ))}
             </div>
@@ -78,7 +86,7 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
                 </Link>
               </div>
               <button
-                className="md:hidden p-2 text-slate-600"
+                className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
                 {isMobileMenuOpen ? <X /> : <Menu />}

@@ -10,7 +10,8 @@ import {
   MoveUp, MoveDown, Settings, Globe, Sliders, BoxSelect, Sun, Droplet, Monitor, Grid,
   Maximize, Minimize, Crop, ArrowLeftRight, Square, Circle,
   Bold, Italic, Underline as UnderlineIcon, Highlighter, Layers, Box,
-  Filter, Smartphone, Laptop, Columns
+  Filter, Smartphone, Laptop, Columns, Wand2, PaintBucket, Hash,
+  ArrowDown, ArrowRight, ArrowDownRight, ArrowLeft, ArrowUpRight, Waves, ChevronDown
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -32,14 +33,28 @@ interface SavedTemplate {
   date: string;
 }
 
+interface GlobalSettings {
+  width: string;
+  backgroundColor: string;
+  backgroundType: 'solid' | 'gradient';
+  gradient: { from: string; to: string; direction: string };
+  pattern: 'none' | 'grid' | 'dots' | 'lines' | 'checker';
+  patternOpacity: number;
+  patternColor: string;
+  noise: {
+    enabled: boolean;
+    amount: number;
+    scale: number;
+    blendMode: string;
+  };
+}
+
 // --- Helpers ---
 
 const hexToRgba = (hex: string = '#000000', alpha: number) => {
-  // Guard against undefined or short hex codes
   if (!hex || (hex.length !== 4 && hex.length !== 7)) {
       return `rgba(0, 0, 0, ${alpha})`;
   }
-
   let r = 0, g = 0, b = 0;
   if (hex.length === 4) {
     r = parseInt(hex[1] + hex[1], 16);
@@ -51,6 +66,33 @@ const hexToRgba = (hex: string = '#000000', alpha: number) => {
     b = parseInt(hex.slice(5, 7), 16);
   }
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const getBackgroundStyle = (settings: GlobalSettings) => {
+  let bg = settings.backgroundType === 'gradient' 
+    ? `linear-gradient(${settings.gradient.direction}, ${settings.gradient.from}, ${settings.gradient.to})`
+    : settings.backgroundColor;
+  
+  return bg;
+};
+
+const getPatternStyle = (settings: GlobalSettings) => {
+  if (settings.pattern === 'none') return '';
+  
+  const color = hexToRgba(settings.patternColor, settings.patternOpacity);
+  
+  switch (settings.pattern) {
+    case 'grid':
+      return `background-image: linear-gradient(${color} 1px, transparent 1px), linear-gradient(90deg, ${color} 1px, transparent 1px); background-size: 20px 20px;`;
+    case 'dots':
+      return `background-image: radial-gradient(${color} 1px, transparent 1px); background-size: 20px 20px;`;
+    case 'lines':
+      return `background-image: repeating-linear-gradient(45deg, ${color} 0, ${color} 1px, transparent 0, transparent 50%); background-size: 10px 10px;`;
+    case 'checker':
+      return `background-image: conic-gradient(${color} 90deg, transparent 90deg 180deg, ${color} 180deg 270deg, transparent 270deg); background-size: 20px 20px;`;
+    default:
+      return '';
+  }
 };
 
 // --- Constants & Data ---
@@ -399,9 +441,29 @@ const defaultBlocks: Record<BlockType, Omit<EmailBlock, 'id'>> = {
 
 // --- HTML Generator Helper ---
 
-const generateHtmlFromBlocks = (blocks: EmailBlock[]) => {
+const generateHtmlFromBlocks = (blocks: EmailBlock[], globalSettings?: GlobalSettings) => {
   const fontCss = generateFontCss();
   
+  // Background & Pattern Styles
+  let containerStyle = `background-color: #f3f4f6; margin: 0; padding: 0; min-height: 100vh;`;
+  let wrapperStyle = `max-width: 600px; margin: 0 auto; overflow: hidden;`;
+  let noiseSvg = '';
+
+  if (globalSettings) {
+     const bgStyle = getBackgroundStyle(globalSettings);
+     const patternStyle = getPatternStyle(globalSettings);
+     containerStyle = `background: ${bgStyle}; ${patternStyle} margin: 0; padding: 20px 0; min-height: 100vh;`;
+     wrapperStyle = `max-width: ${globalSettings.width || '600px'}; margin: 0 auto; overflow: hidden; background-color: transparent;`;
+     
+     if (globalSettings.noise.enabled) {
+        // Simple SVG Noise overlay using data URI for better support than raw filters in some clients
+        // Ideally this should be a filter, but many email clients block <filter>. 
+        // We will use a semi-transparent textured background image for noise simulation in 'patternStyle' if needed,
+        // but for modern web view we can use filter.
+        // For this preview we will inject a div overlay.
+     }
+  }
+
   const bodyContent = blocks.map(block => {
     const { type, content, styles } = block;
     
@@ -658,13 +720,31 @@ const generateHtmlFromBlocks = (blocks: EmailBlock[]) => {
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;700;900&display=swap" rel="stylesheet">
 <style>
   ${fontCss}
-  body { margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Vazirmatn', sans-serif; }
+  body { ${containerStyle} font-family: 'Vazirmatn', sans-serif; }
   * { box-sizing: border-box; }
-  .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; overflow: hidden; }
+  .email-container { ${wrapperStyle} }
   a { text-decoration: none; }
+  ${globalSettings?.noise.enabled ? `
+  .noise-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: ${globalSettings.noise.amount};
+    filter: url(#noiseFilter);
+    mix-blend-mode: ${globalSettings.noise.blendMode};
+  }` : ''}
 </style>
 </head>
 <body>
+  ${globalSettings?.noise.enabled ? `
+  <svg style="display: none;">
+    <filter id="noiseFilter">
+      <feTurbulence type="fractalNoise" baseFrequency="${globalSettings.noise.scale}" numOctaves="3" stitchTiles="stitch"/>
+    </filter>
+  </svg>
+  <div class="noise-overlay"></div>
+  ` : ''}
   <div class="email-container">
     ${bodyContent}
   </div>
@@ -678,12 +758,35 @@ export const DashboardEmailBuilder: React.FC = () => {
   const [blocks, setBlocks] = useState<EmailBlock[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'design' | 'code'>('design');
+  const [sidebarMode, setSidebarMode] = useState<'blocks' | 'global_settings'>('blocks');
+  
+  // AI State
   const [aiPrompt, setAiPrompt] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiMode, setAiMode] = useState<'structure' | 'template'>('structure'); // 'structure' is old sidebar prompt, 'template' is full template generation
+
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
+
+  // Global Settings State
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
+    width: '600px',
+    backgroundColor: '#f3f4f6',
+    backgroundType: 'solid',
+    gradient: { from: '#f3f4f6', to: '#e5e7eb', direction: 'to bottom' },
+    pattern: 'none',
+    patternOpacity: 0.1,
+    patternColor: '#000000',
+    noise: {
+      enabled: false,
+      amount: 0.05,
+      scale: 0.5,
+      blendMode: 'overlay'
+    }
+  });
 
   // Drag and Drop State
   const dragItem = useRef<BlockType | null>(null);
@@ -714,6 +817,7 @@ export const DashboardEmailBuilder: React.FC = () => {
       setBlocks([...blocks, newBlock]);
     }
     setSelectedBlockId(newBlock.id);
+    setSidebarMode('blocks');
   };
 
   const updateBlock = (id: string, updates: Partial<EmailBlock>) => {
@@ -738,6 +842,17 @@ export const DashboardEmailBuilder: React.FC = () => {
         } 
       } : b
     ));
+  };
+
+  const updateGlobalSetting = (key: keyof GlobalSettings, value: any) => {
+    setGlobalSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateGlobalNestedSetting = (category: 'gradient' | 'noise', key: string, value: any) => {
+    setGlobalSettings(prev => ({
+      ...prev,
+      [category]: { ...(prev[category] as any), [key]: value }
+    }));
   };
 
   // Specific for Product Grid Item updates
@@ -861,12 +976,13 @@ export const DashboardEmailBuilder: React.FC = () => {
     setIsAiLoading(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const prompt = aiMode === 'template' 
+        ? `Create a FULL email template for: "${aiPrompt}". Return a JSON OBJECT with a key "blocks". The value must be an array of objects matching this structure: { "type": "header" | "text" | "button" | "image" | "footer", "content": { ... }, "styles": { ... } }. Include at least 4-5 blocks to make it look complete.`
+        : `Create an email template structure for: "${aiPrompt}". Return a JSON OBJECT with a key "blocks". The value must be an array of objects matching this structure: { "type": "header" | "text" | "button" | "image" | "footer", "content": { ... }, "styles": { ... } }. Return ONLY valid JSON.`;
+
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Create an email template for: "${aiPrompt}".
-        Return a JSON OBJECT with a key "blocks". The value must be an array of objects matching this structure:
-        { "type": "header" | "text" | "button" | "image" | "footer", "content": { ... }, "styles": { ... } }
-        Return ONLY valid JSON.`,
+        contents: prompt,
         config: { responseMimeType: "application/json" }
       });
 
@@ -878,6 +994,7 @@ export const DashboardEmailBuilder: React.FC = () => {
           styles: { ...defaultBlocks[b.type as BlockType]?.styles, ...b.styles }
         }));
         setBlocks(newBlocks);
+        setShowAiModal(false);
       }
     } catch (error) {
       console.error("AI Error:", error);
@@ -908,7 +1025,7 @@ export const DashboardEmailBuilder: React.FC = () => {
   };
 
   const selectedBlock = blocks.find(b => b.id === selectedBlockId);
-  const rawHtml = generateHtmlFromBlocks(blocks);
+  const rawHtml = generateHtmlFromBlocks(blocks, globalSettings);
 
   // Tab State for Product Grid Settings
   const [gridTab, setGridTab] = useState<'layout' | 'items' | 'imgStyle' | 'txtStyle'>('layout');
@@ -965,7 +1082,256 @@ export const DashboardEmailBuilder: React.FC = () => {
         
         {/* --- Left: Properties Panel (Contextual) --- */}
         <AnimatePresence mode="wait">
-          {selectedBlock ? (
+          {sidebarMode === 'global_settings' ? (
+             <motion.div 
+               key="global-settings"
+               initial={{ width: 0, opacity: 0 }}
+               animate={{ width: 320, opacity: 1 }}
+               exit={{ width: 0, opacity: 0 }}
+               className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden"
+             >
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 backdrop-blur-sm sticky top-0 z-10">
+                   <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                      <Sliders size={16} className="text-blue-600" />
+                      تنظیمات قالب
+                   </h3>
+                   <button onClick={() => setSidebarMode('blocks')} className="p-1 hover:bg-slate-200 rounded-lg transition-colors"><X size={16} className="text-slate-500" /></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
+                   {/* Background Section */}
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                         <div className="text-sm font-bold text-slate-800">پس‌زمینه</div>
+                         <div className="flex bg-slate-100 p-1 rounded-lg">
+                            <button 
+                              onClick={() => updateGlobalSetting('backgroundType', 'solid')} 
+                              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${globalSettings.backgroundType === 'solid' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                               تک رنگ
+                            </button>
+                            <button 
+                              onClick={() => updateGlobalSetting('backgroundType', 'gradient')} 
+                              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${globalSettings.backgroundType === 'gradient' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                               گرادینت
+                            </button>
+                         </div>
+                      </div>
+
+                      {globalSettings.backgroundType === 'solid' ? (
+                         <div className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl bg-slate-50/50 hover:border-blue-300 transition-colors group">
+                            <div className="w-10 h-10 rounded-lg border border-slate-200 overflow-hidden shrink-0 relative shadow-sm">
+                               <input 
+                                 type="color" 
+                                 value={globalSettings.backgroundColor}
+                                 onChange={(e) => updateGlobalSetting('backgroundColor', e.target.value)}
+                                 className="absolute -top-2 -left-2 w-16 h-16 cursor-pointer p-0 border-none"
+                               />
+                            </div>
+                            <div className="flex-1">
+                               <label className="text-[10px] text-slate-500 font-medium mb-1 block">رنگ اصلی</label>
+                               <div className="text-xs font-mono text-slate-900 font-bold bg-white px-2 py-1 rounded border border-slate-200 w-fit" dir="ltr">
+                                  {globalSettings.backgroundColor.toUpperCase()}
+                               </div>
+                            </div>
+                         </div>
+                      ) : (
+                         <div className="space-y-3 p-3 border border-slate-200 rounded-xl bg-slate-50/50">
+                            {/* Direction Selector */}
+                            <div>
+                               <label className="text-[10px] font-bold text-slate-600 mb-2 block">جهت گرادینت</label>
+                               <div className="grid grid-cols-3 gap-2">
+                                  {['to bottom', 'to right', 'to bottom right'].map((dir) => (
+                                     <button
+                                       key={dir}
+                                       onClick={() => updateGlobalNestedSetting('gradient', 'direction', dir)}
+                                       className={`h-8 rounded-lg border flex items-center justify-center transition-all ${globalSettings.gradient.direction === dir ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300'}`}
+                                     >
+                                        {dir === 'to bottom' && <ArrowDown size={14} />}
+                                        {dir === 'to right' && <ArrowRight size={14} />}
+                                        {dir === 'to bottom right' && <ArrowDownRight size={14} />}
+                                     </button>
+                                  ))}
+                               </div>
+                            </div>
+                            
+                            {/* Colors */}
+                            <div className="flex items-center gap-2">
+                               <div className="flex-1 flex flex-col gap-1">
+                                  <label className="text-[9px] text-slate-500">شروع</label>
+                                  <div className="h-9 flex items-center gap-2 bg-white px-2 rounded-lg border border-slate-200 focus-within:border-blue-400 transition-colors">
+                                     <div className="w-5 h-5 rounded overflow-hidden border border-slate-200 relative shrink-0">
+                                        <input type="color" value={globalSettings.gradient.from} onChange={(e) => updateGlobalNestedSetting('gradient', 'from', e.target.value)} className="absolute -top-1 -left-1 w-8 h-8 cursor-pointer border-none p-0" />
+                                     </div>
+                                     <span className="text-[10px] font-mono text-slate-700 truncate" dir="ltr">{globalSettings.gradient.from}</span>
+                                  </div>
+                               </div>
+                               <div className="text-slate-300 mt-4"><ArrowLeft size={14} /></div>
+                               <div className="flex-1 flex flex-col gap-1">
+                                  <label className="text-[9px] text-slate-500">پایان</label>
+                                  <div className="h-9 flex items-center gap-2 bg-white px-2 rounded-lg border border-slate-200 focus-within:border-blue-400 transition-colors">
+                                     <div className="w-5 h-5 rounded overflow-hidden border border-slate-200 relative shrink-0">
+                                        <input type="color" value={globalSettings.gradient.to} onChange={(e) => updateGlobalNestedSetting('gradient', 'to', e.target.value)} className="absolute -top-1 -left-1 w-8 h-8 cursor-pointer border-none p-0" />
+                                     </div>
+                                     <span className="text-[10px] font-mono text-slate-700 truncate" dir="ltr">{globalSettings.gradient.to}</span>
+                                  </div>
+                               </div>
+                            </div>
+                         </div>
+                      )}
+                   </div>
+
+                   <div className="h-px bg-slate-100"></div>
+
+                   {/* Patterns */}
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                         <div className="text-sm font-bold text-slate-800">الگو (Pattern)</div>
+                         {globalSettings.pattern !== 'none' && (
+                            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1 pr-2">
+                               <input type="color" value={globalSettings.patternColor} onChange={(e) => updateGlobalSetting('patternColor', e.target.value)} className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent" />
+                               <span className="text-[10px] text-slate-500 font-mono" dir="ltr">{globalSettings.patternColor}</span>
+                            </div>
+                         )}
+                      </div>
+                      
+                      <div className="grid grid-cols-5 gap-2">
+                         {[
+                           { id: 'none', icon: <X size={16} />, label: 'ساده' },
+                           { id: 'grid', icon: <Grid size={16} />, label: 'گرید' },
+                           { id: 'dots', icon: <Circle size={10} fill="currentColor" />, label: 'نقطه' },
+                           { id: 'lines', icon: <ArrowUpRight size={16} />, label: 'خط' },
+                           { id: 'checker', icon: <LayoutTemplate size={16} />, label: 'شطرنجی' }
+                         ].map(p => (
+                            <button 
+                              key={p.id}
+                              onClick={() => updateGlobalSetting('pattern', p.id)}
+                              className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${globalSettings.pattern === p.id ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-600 ring-offset-2' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50'}`}
+                              title={p.label}
+                            >
+                               {p.icon}
+                            </button>
+                         ))}
+                      </div>
+                      
+                      {globalSettings.pattern !== 'none' && (
+                         <div className="pt-2">
+                            <div className="flex justify-between mb-2">
+                               <span className="text-[10px] font-bold text-slate-600">شفافیت الگو</span>
+                               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{Math.round(globalSettings.patternOpacity * 100)}%</span>
+                            </div>
+                            <input 
+                              type="range" min="0.01" max="0.5" step="0.01"
+                              value={globalSettings.patternOpacity}
+                              onChange={(e) => updateGlobalSetting('patternOpacity', parseFloat(e.target.value))}
+                              className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                            />
+                         </div>
+                      )}
+                   </div>
+
+                   <div className="h-px bg-slate-100"></div>
+
+                   {/* Noise */}
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${globalSettings.noise.enabled ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400'}`}>
+                               <Waves size={18} />
+                            </div>
+                            <div>
+                               <div className="text-sm font-bold text-slate-800">نویز (Noise)</div>
+                               <div className="text-[10px] text-slate-500">بافت دانه‌ای</div>
+                            </div>
+                         </div>
+                         
+                         <label className="relative inline-flex items-center cursor-pointer">
+                           <input 
+                             type="checkbox" 
+                             checked={globalSettings.noise.enabled}
+                             onChange={(e) => updateGlobalNestedSetting('noise', 'enabled', e.target.checked)}
+                             className="sr-only peer"
+                           />
+                           <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                         </label>
+                      </div>
+
+                      {globalSettings.noise.enabled && (
+                         <div className="space-y-4 bg-slate-50/50 p-4 rounded-xl border border-slate-200 animate-in slide-in-from-top-2">
+                            <div className="space-y-3">
+                               <div>
+                                  <div className="flex justify-between mb-2">
+                                     <span className="text-[10px] font-bold text-slate-600">شدت</span>
+                                     <span className="text-[10px] text-slate-500">{Math.round(globalSettings.noise.amount * 100)}%</span>
+                                  </div>
+                                  <input 
+                                    type="range" min="0" max="0.5" step="0.01"
+                                    value={globalSettings.noise.amount}
+                                    onChange={(e) => updateGlobalNestedSetting('noise', 'amount', parseFloat(e.target.value))}
+                                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                  />
+                               </div>
+                               <div>
+                                  <div className="flex justify-between mb-2">
+                                     <span className="text-[10px] font-bold text-slate-600">تراکم</span>
+                                     <span className="text-[10px] text-slate-500">{globalSettings.noise.scale}</span>
+                                  </div>
+                                  <input 
+                                    type="range" min="0.1" max="5" step="0.1"
+                                    value={globalSettings.noise.scale}
+                                    onChange={(e) => updateGlobalNestedSetting('noise', 'scale', parseFloat(e.target.value))}
+                                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                  />
+                               </div>
+                            </div>
+                            
+                            <div className="pt-2 border-t border-slate-200/50">
+                               <label className="text-[10px] font-bold text-slate-600 block mb-2">حالت ترکیب (Blend Mode)</label>
+                               <div className="relative">
+                                  <select 
+                                    value={globalSettings.noise.blendMode}
+                                    onChange={(e) => updateGlobalNestedSetting('noise', 'blendMode', e.target.value)}
+                                    className="w-full text-xs p-2.5 pl-8 border border-slate-200 rounded-lg bg-white appearance-none focus:ring-2 focus:ring-purple-500/20 outline-none text-slate-700 font-medium"
+                                  >
+                                     <option value="overlay">Overlay (پیش‌فرض)</option>
+                                     <option value="multiply">Multiply (تیره‌تر)</option>
+                                     <option value="screen">Screen (روشن‌تر)</option>
+                                     <option value="soft-light">Soft Light (ملایم)</option>
+                                  </select>
+                                  <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                               </div>
+                            </div>
+                         </div>
+                      )}
+                   </div>
+
+                   <div className="h-px bg-slate-100"></div>
+
+                   {/* Canvas Size */}
+                   <div className="space-y-3 pb-4">
+                      <div className="text-sm font-bold text-slate-800">ابعاد ایمیل</div>
+                      <div className="flex items-center justify-between bg-slate-50 p-1 pl-2 rounded-xl border border-slate-200">
+                         <div className="flex items-center gap-2 px-3 py-2">
+                            <Maximize size={16} className="text-slate-400" />
+                            <span className="text-xs font-bold text-slate-600">حداکثر عرض</span>
+                         </div>
+                         <div className="flex items-center">
+                            <input 
+                              type="text" dir="ltr"
+                              value={globalSettings.width}
+                              onChange={(e) => updateGlobalSetting('width', e.target.value)}
+                              className="w-20 text-xs font-bold text-center py-1.5 border border-slate-200 rounded-lg bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-slate-800"
+                            />
+                         </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed pr-1">
+                         * عرض استاندارد ایمیل‌ها معمولاً ۶۰۰ پیکسل است تا در موبایل و دسکتاپ به درستی نمایش داده شود.
+                      </p>
+                   </div>
+                </div>
+             </motion.div>
+          ) : selectedBlock ? (
              <motion.div 
                key="properties"
                initial={{ width: 0, opacity: 0 }}
@@ -982,7 +1348,7 @@ export const DashboardEmailBuilder: React.FC = () => {
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                   
+                   {/* ... (Existing Block Settings Logic) ... */}
                    {/* BUTTON SETTINGS */}
                    {selectedBlock.type === 'button' && (
                      /* ... (Button Settings Code - Kept Same) ... */
@@ -2393,7 +2759,7 @@ export const DashboardEmailBuilder: React.FC = () => {
                    />
                    <Button 
                      fullWidth 
-                     onClick={handleGenerateAi} 
+                     onClick={() => { setAiMode('structure'); handleGenerateAi(); }}
                      disabled={isAiLoading || !aiPrompt}
                      className="bg-purple-600 hover:bg-purple-700 border-none"
                    >
@@ -2429,34 +2795,64 @@ export const DashboardEmailBuilder: React.FC = () => {
                   }
                 }}
               >
-                 <div className="w-full max-w-[600px] min-h-[500px] bg-white shadow-2xl shadow-slate-300/50 flex flex-col" style={{ direction: 'rtl' }}>
-                    {blocks.length === 0 ? (
-                       <div className="flex-1 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 m-4 rounded-xl">
-                          <MousePointer2 size={48} className="mb-4 opacity-50" />
-                          <p className="text-sm font-bold">المان‌ها را اینجا رها کنید</p>
-                          <p className="text-xs mt-2">یا از هوش مصنوعی کمک بگیرید</p>
-                       </div>
-                    ) : (
-                       <Reorder.Group axis="y" values={blocks} onReorder={setBlocks} className="flex flex-col h-full">
-                          {blocks.map((block) => (
-                             <Reorder.Item key={block.id} value={block}>
-                                <div 
-                                  onClick={() => setSelectedBlockId(block.id)}
-                                  className={`relative group cursor-pointer transition-all ${selectedBlockId === block.id ? 'ring-2 ring-blue-500 z-10' : 'hover:ring-1 hover:ring-blue-300'}`}
-                                >
-                                   {/* Block Actions Overlay */}
-                                   <div className={`absolute top-0 right-[-32px] flex flex-col gap-1 opacity-0 group-hover:opacity-100 ${selectedBlockId === block.id ? 'opacity-100' : ''}`}>
-                                      <button onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'up')}} className="p-1 bg-white border border-slate-200 rounded text-slate-500 hover:text-blue-600"><MoveUp size={14} /></button>
-                                      <button onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'down')}} className="p-1 bg-white border border-slate-200 rounded text-slate-500 hover:text-blue-600"><MoveDown size={14} /></button>
-                                   </div>
-
-                                   {/* Render Block Content (Simplified Preview) */}
-                                   <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: generateHtmlFromBlocks([block]).match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || '' }} />
-                                </div>
-                             </Reorder.Item>
-                          ))}
-                       </Reorder.Group>
+                 <div 
+                   className="w-full min-h-[500px] shadow-2xl shadow-slate-300/50 flex flex-col transition-all duration-300"
+                   style={{ 
+                     direction: 'rtl',
+                     maxWidth: globalSettings.width,
+                     background: getBackgroundStyle(globalSettings),
+                     backgroundImage: getPatternStyle(globalSettings).replace('background-image: ', '').replace(';', ''),
+                     // Noise is handled via SVG overlay in rawHtml generation or a separate layer here if needed for preview
+                     position: 'relative'
+                   }}
+                 >
+                    {/* Noise Overlay for Preview */}
+                    {globalSettings.noise.enabled && (
+                       <div 
+                         style={{
+                           position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+                           opacity: globalSettings.noise.amount,
+                           mixBlendMode: globalSettings.noise.blendMode as any,
+                           filter: 'url(#noiseFilterPreview)'
+                         }}
+                       ></div>
                     )}
+                    {/* SVG Filter Def for Preview */}
+                    <svg style={{ display: 'none' }}>
+                      <filter id="noiseFilterPreview">
+                        <feTurbulence type="fractalNoise" baseFrequency={globalSettings.noise.scale} numOctaves="3" stitchTiles="stitch"/>
+                      </filter>
+                    </svg>
+
+                    <div className="relative z-10 flex flex-col h-full">
+                      {blocks.length === 0 ? (
+                         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 m-4 rounded-xl bg-white/50 backdrop-blur-sm">
+                            <MousePointer2 size={48} className="mb-4 opacity-50" />
+                            <p className="text-sm font-bold">المان‌ها را اینجا رها کنید</p>
+                            <p className="text-xs mt-2">یا از هوش مصنوعی کمک بگیرید</p>
+                         </div>
+                      ) : (
+                         <Reorder.Group axis="y" values={blocks} onReorder={setBlocks} className="flex flex-col h-full">
+                            {blocks.map((block) => (
+                               <Reorder.Item key={block.id} value={block}>
+                                  <div 
+                                    onClick={() => { setSelectedBlockId(block.id); setSidebarMode('blocks'); }}
+                                    className={`relative group cursor-pointer transition-all ${selectedBlockId === block.id ? 'ring-2 ring-blue-500 z-10' : 'hover:ring-1 hover:ring-blue-300'}`}
+                                  >
+                                     {/* Block Actions Overlay */}
+                                     <div className={`absolute top-0 right-[-32px] flex flex-col gap-1 opacity-0 group-hover:opacity-100 ${selectedBlockId === block.id ? 'opacity-100' : ''}`}>
+                                        <button onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'up')}} className="p-1 bg-white border border-slate-200 rounded text-slate-500 hover:text-blue-600"><MoveUp size={14} /></button>
+                                        <button onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'down')}} className="p-1 bg-white border border-slate-200 rounded text-slate-500 hover:text-blue-600"><MoveDown size={14} /></button>
+                                     </div>
+
+                                     {/* Render Block Content (Simplified Preview) */}
+                                     <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: generateHtmlFromBlocks([block]).match(/<div class="email-container"[^>]*>([\s\S]*)<\/div>\s*<\/body>/)?.[1] || '' }} />
+                                  </div>
+                               </Reorder.Item>
+                            ))}
+                         </Reorder.Group>
+                      )}
+                    </div>
                  </div>
               </div>
            )}
@@ -2496,11 +2892,70 @@ export const DashboardEmailBuilder: React.FC = () => {
                 </div>
               ))}
            </div>
+
+           {/* --- New Bottom Action Buttons --- */}
+           <div className="p-4 border-t border-slate-100 bg-slate-50 space-y-2">
+              <button 
+                onClick={() => { setShowAiModal(true); setAiMode('template'); }}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-all active:scale-95"
+              >
+                 <Wand2 size={16} />
+                 ساخت قالب با هوش مصنوعی
+              </button>
+              
+              <button 
+                onClick={() => { setSelectedBlockId(null); setSidebarMode('global_settings'); }}
+                className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95"
+              >
+                 <PaintBucket size={16} />
+                 تنظیمات قالب
+              </button>
+           </div>
         </div>
 
       </div>
 
-      {/* --- Modals (Save/Load) --- */}
+      {/* --- Modals (Save/Load/AI) --- */}
+      {/* AI Prompt Modal */}
+      <AnimatePresence>
+        {showAiModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowAiModal(false)} />
+             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 p-6">
+                <div className="flex justify-between items-center mb-6">
+                   <h3 className="font-bold text-lg flex items-center gap-2">
+                      <Sparkles className="text-purple-600" />
+                      {aiMode === 'template' ? 'ساخت قالب کامل' : 'تولید ساختار'}
+                   </h3>
+                   <button onClick={() => setShowAiModal(false)}><X className="text-slate-400" /></button>
+                </div>
+                
+                <p className="text-sm text-slate-500 mb-4">
+                   {aiMode === 'template' 
+                     ? 'توضیحات کاملی از ایمیل مورد نظر خود بنویسید (مثال: ایمیل معرفی محصول جدید کفش ورزشی با تم تیره و اسپرت).' 
+                     : 'چه نوع ساختاری نیاز دارید؟'}
+                </p>
+
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="اینجا بنویسید..."
+                  className="w-full h-32 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500/20 resize-none mb-6 text-slate-900"
+                />
+                
+                <Button 
+                  onClick={handleGenerateAi} 
+                  disabled={isAiLoading || !aiPrompt} 
+                  fullWidth
+                  className="bg-purple-600 hover:bg-purple-700 border-none"
+                >
+                   {isAiLoading ? <RefreshCw size={18} className="animate-spin" /> : 'شروع پردازش'}
+                </Button>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Save Modal */}
       <AnimatePresence>
         {showSaveModal && (

@@ -5,7 +5,7 @@ import {
   Folder, FileText, Image as ImageIcon, MoreVertical, Search, Plus, 
   Upload, Home, ChevronLeft, Grid, List, Trash2, FolderPlus, 
   Copy, Scissors, ClipboardPaste, Tag, Edit3, CheckCircle, File, Film, X,
-  HardDrive, Clock, Star, Cloud, Info, Download, ChevronRight, Eye
+  HardDrive, Clock, Star, Cloud, Info, Download, ChevronRight, Eye, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -22,18 +22,20 @@ interface FileSystemItem {
   tags: string[];
   color?: string; // For folders
   thumbnail?: string; // For images
+  isStarred?: boolean;
+  isDeleted?: boolean;
 }
 
 // --- Mock Initial Data ---
 const initialFileSystem: FileSystemItem[] = [
-  { id: '1', name: 'تصاویر کمپین', type: 'folder', parentId: null, date: '1402/09/01', tags: ['مهم'], color: 'blue' },
-  { id: '2', name: 'اسناد اداری', type: 'folder', parentId: null, date: '1402/08/15', tags: [], color: 'slate' },
-  { id: '3', name: 'ویدیوهای آموزشی', type: 'folder', parentId: null, date: '1402/09/10', tags: ['ویدیو'], color: 'red' },
-  { id: '4', name: 'logo_v1.png', type: 'image', parentId: '1', size: '2.4 MB', date: '1402/09/02', tags: ['برندینگ'] },
-  { id: '5', name: 'banner_yalda.jpg', type: 'image', parentId: '1', size: '1.1 MB', date: '1402/09/20', tags: ['یلدا'] },
-  { id: '6', name: 'contract_template.pdf', type: 'document', parentId: '2', size: '450 KB', date: '1402/08/20', tags: ['قرارداد'] },
-  { id: '7', name: 'intro_course.mp4', type: 'video', parentId: '3', size: '120 MB', date: '1402/09/11', tags: [] },
-  { id: '8', name: 'report_2024.docx', type: 'document', parentId: null, size: '22 KB', date: '1402/10/01', tags: [] },
+  { id: '1', name: 'تصاویر کمپین', type: 'folder', parentId: null, date: '1402/09/01', tags: ['مهم'], color: 'blue', isStarred: true, isDeleted: false },
+  { id: '2', name: 'اسناد اداری', type: 'folder', parentId: null, date: '1402/08/15', tags: [], color: 'slate', isStarred: false, isDeleted: false },
+  { id: '3', name: 'ویدیوهای آموزشی', type: 'folder', parentId: null, date: '1402/09/10', tags: ['ویدیو'], color: 'red', isStarred: false, isDeleted: false },
+  { id: '4', name: 'logo_v1.png', type: 'image', parentId: '1', size: '2.4 MB', date: '1402/09/02', tags: ['برندینگ'], isStarred: false, isDeleted: false },
+  { id: '5', name: 'banner_yalda.jpg', type: 'image', parentId: '1', size: '1.1 MB', date: '1402/09/20', tags: ['یلدا'], isStarred: true, isDeleted: false },
+  { id: '6', name: 'contract_template.pdf', type: 'document', parentId: '2', size: '450 KB', date: '1402/08/20', tags: ['قرارداد'], isStarred: false, isDeleted: false },
+  { id: '7', name: 'intro_course.mp4', type: 'video', parentId: '3', size: '120 MB', date: '1402/09/11', tags: [], isStarred: false, isDeleted: false },
+  { id: '8', name: 'report_2024.docx', type: 'document', parentId: null, size: '22 KB', date: '1402/10/01', tags: [], isStarred: false, isDeleted: false },
 ];
 
 const FOLDER_COLORS = [
@@ -51,7 +53,7 @@ export const DashboardFileManager: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [navSection, setNavSection] = useState<'all' | 'recent' | 'favorites'>('all');
+  const [navSection, setNavSection] = useState<'all' | 'recent' | 'favorites' | 'trash'>('all');
   
   // Clipboard
   const [clipboard, setClipboard] = useState<{ action: 'copy' | 'cut', items: string[] } | null>(null);
@@ -82,16 +84,28 @@ export const DashboardFileManager: React.FC = () => {
   }
 
   const filteredItems = items.filter(item => {
-    // 1. Navigation Filter
+    // 1. Trash Filter (Global)
+    if (navSection === 'trash') {
+      return item.isDeleted;
+    }
+    // Don't show deleted items in other views
+    if (item.isDeleted) return false;
+
+    // 2. Favorites Filter
+    if (navSection === 'favorites') {
+      return item.isStarred;
+    }
+
+    // 3. Recent Filter (Mock)
     if (navSection === 'recent') {
-       // Mock recent logic
        return true; 
     }
     
-    // 2. Folder Navigation
+    // 4. Folder Navigation (Default View)
+    // Only filter by parentId if we are in 'all' view AND not searching
     const isParentMatch = searchQuery ? true : item.parentId === currentFolderId;
     
-    // 3. Search Query
+    // 5. Search Query
     const isNameMatch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     
     return isParentMatch && isNameMatch;
@@ -117,7 +131,9 @@ export const DashboardFileManager: React.FC = () => {
       parentId: currentFolderId,
       date: new Date().toLocaleDateString('fa-IR'),
       tags: [],
-      color: newFolderColor
+      color: newFolderColor,
+      isStarred: false,
+      isDeleted: false
     };
     
     setItems([...items, newFolder]);
@@ -138,7 +154,9 @@ export const DashboardFileManager: React.FC = () => {
           parentId: currentFolderId,
           size: `${(f.size / 1024 / 1024).toFixed(1)} MB`,
           date: new Date().toLocaleDateString('fa-IR'),
-          tags: []
+          tags: [],
+          isStarred: false,
+          isDeleted: false
         }));
         setItems(prev => [...prev, ...newFiles]);
         setIsUploading(false);
@@ -152,11 +170,29 @@ export const DashboardFileManager: React.FC = () => {
   };
 
   const handleDelete = () => {
-    if (confirm('آیا از حذف آیتم‌های انتخاب شده اطمینان دارید؟')) {
+    if (navSection === 'trash') {
+      if (confirm('آیا از حذف دائمی این موارد اطمینان دارید؟ این عملیات قابل بازگشت نیست.')) {
+        const idsToDelete = new Set(selectedItems);
+        setItems(items.filter(i => !idsToDelete.has(i.id)));
+        setSelectedItems([]);
+      }
+    } else {
+      // Soft Delete
       const idsToDelete = new Set(selectedItems);
-      setItems(items.filter(i => !idsToDelete.has(i.id)));
+      setItems(items.map(i => idsToDelete.has(i.id) ? { ...i, isDeleted: true } : i));
       setSelectedItems([]);
     }
+  };
+
+  const handleRestore = () => {
+    const idsToRestore = new Set(selectedItems);
+    setItems(items.map(i => idsToRestore.has(i.id) ? { ...i, isDeleted: false } : i));
+    setSelectedItems([]);
+  };
+
+  const toggleStar = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setItems(items.map(i => i.id === id ? { ...i, isStarred: !i.isStarred } : i));
   };
 
   const handleCopy = () => {
@@ -254,17 +290,23 @@ export const DashboardFileManager: React.FC = () => {
               فایل‌های من
             </button>
             <button 
-              onClick={() => setNavSection('recent')}
+              onClick={() => { setNavSection('recent'); setSelectedItems([]); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${navSection === 'recent' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
             >
               <Clock size={18} />
               اخیر
             </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <button 
+              onClick={() => { setNavSection('favorites'); setSelectedItems([]); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${navSection === 'favorites' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
               <Star size={18} />
-              نشان‌شده‌ها
+              نشان‌ شده‌ها
             </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <button 
+              onClick={() => { setNavSection('trash'); setSelectedItems([]); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${navSection === 'trash' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
               <Trash2 size={18} />
               سطل زباله
             </button>
@@ -307,29 +349,52 @@ export const DashboardFileManager: React.FC = () => {
         <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-6 shrink-0">
           {/* Breadcrumbs */}
           <div className="flex items-center gap-2 overflow-hidden">
-             <button onClick={() => setCurrentFolderId(null)} className={`hover:bg-slate-100 p-1.5 rounded-lg transition-colors ${!currentFolderId ? 'text-slate-900' : 'text-slate-500'}`}>
-               <Home size={18} />
-             </button>
-             {breadcrumbs.map((folder, idx) => (
-                <React.Fragment key={folder.id}>
-                   <ChevronLeft size={16} className="text-slate-300" />
-                   <button 
-                     onClick={() => setCurrentFolderId(folder.id)}
-                     className={`text-sm font-bold truncate hover:bg-slate-100 px-2 py-1 rounded-lg transition-colors ${idx === breadcrumbs.length - 1 ? 'text-slate-900' : 'text-slate-500'}`}
-                   >
-                      {folder.name}
+             {navSection === 'trash' ? (
+                <span className="text-lg font-bold text-red-600 flex items-center gap-2">
+                   <Trash2 size={20} />
+                   سطل زباله
+                </span>
+             ) : navSection === 'favorites' ? (
+                <span className="text-lg font-bold text-amber-500 flex items-center gap-2">
+                   <Star size={20} fill="currentColor" />
+                   نشان‌ شده‌ها
+                </span>
+             ) : (
+                <>
+                   <button onClick={() => setCurrentFolderId(null)} className={`hover:bg-slate-100 p-1.5 rounded-lg transition-colors ${!currentFolderId ? 'text-slate-900' : 'text-slate-500'}`}>
+                     <Home size={18} />
                    </button>
-                </React.Fragment>
-             ))}
+                   {breadcrumbs.map((folder, idx) => (
+                      <React.Fragment key={folder.id}>
+                         <ChevronLeft size={16} className="text-slate-300" />
+                         <button 
+                           onClick={() => setCurrentFolderId(folder.id)}
+                           className={`text-sm font-bold truncate hover:bg-slate-100 px-2 py-1 rounded-lg transition-colors ${idx === breadcrumbs.length - 1 ? 'text-slate-900' : 'text-slate-500'}`}
+                         >
+                            {folder.name}
+                         </button>
+                      </React.Fragment>
+                   ))}
+                </>
+             )}
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-3">
              {selectedItems.length > 0 && (
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg mr-4 animate-in fade-in slide-in-from-top-2">
-                   <button onClick={handleDelete} className="p-2 hover:bg-white text-red-500 rounded-md shadow-sm transition-all" title="حذف"><Trash2 size={16} /></button>
-                   <button onClick={handleCopy} className="p-2 hover:bg-white text-slate-600 rounded-md shadow-sm transition-all" title="کپی"><Copy size={16} /></button>
-                   <button onClick={handleCut} className="p-2 hover:bg-white text-slate-600 rounded-md shadow-sm transition-all" title="برش"><Scissors size={16} /></button>
+                   {navSection === 'trash' && (
+                      <button onClick={handleRestore} className="p-2 hover:bg-white text-green-600 rounded-md shadow-sm transition-all" title="بازیابی"><RefreshCw size={16} /></button>
+                   )}
+                   <button onClick={handleDelete} className="p-2 hover:bg-white text-red-500 rounded-md shadow-sm transition-all" title={navSection === 'trash' ? 'حذف دائمی' : 'حذف'}>
+                      <Trash2 size={16} />
+                   </button>
+                   {navSection !== 'trash' && (
+                      <>
+                         <button onClick={handleCopy} className="p-2 hover:bg-white text-slate-600 rounded-md shadow-sm transition-all" title="کپی"><Copy size={16} /></button>
+                         <button onClick={handleCut} className="p-2 hover:bg-white text-slate-600 rounded-md shadow-sm transition-all" title="برش"><Scissors size={16} /></button>
+                      </>
+                   )}
                 </div>
              )}
              
@@ -358,28 +423,39 @@ export const DashboardFileManager: React.FC = () => {
                 <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}><List size={16} /></button>
              </div>
              
-             <button 
-               onClick={() => setShowCreateFolder(true)}
-               className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
-             >
-               <FolderPlus size={18} />
-             </button>
+             {navSection !== 'trash' && (
+                <button 
+                  onClick={() => setShowCreateFolder(true)}
+                  className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
+                >
+                  <FolderPlus size={18} />
+                </button>
+             )}
           </div>
         </div>
 
         {/* Content */}
         <div 
-          className="flex-1 overflow-y-auto p-6 scroll-smooth" 
+          className="flex-1 overflow-y-auto p-6 scroll-smooth relative" 
           onClick={() => setSelectedItems([])}
           onContextMenu={(e) => e.preventDefault()}
         >
+           {navSection === 'trash' && (
+              <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-6 flex items-center gap-3 text-red-700 text-sm">
+                 <AlertTriangle size={18} />
+                 <span>فایل‌های حذف شده تا ۳۰ روز در سطل زباله باقی می‌مانند و سپس به طور خودکار حذف می‌شوند.</span>
+              </div>
+           )}
+
            {folders.length === 0 && files.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-400">
                  <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                    <Folder size={48} className="text-slate-300" />
+                    {navSection === 'trash' ? <Trash2 size={48} className="text-slate-300" /> : <Folder size={48} className="text-slate-300" />}
                  </div>
-                 <p className="text-lg font-bold text-slate-600">پوشه خالی است</p>
-                 <p className="text-sm mt-1">فایل‌های خود را اینجا بکشید و رها کنید</p>
+                 <p className="text-lg font-bold text-slate-600">
+                    {navSection === 'trash' ? 'سطل زباله خالی است' : 'پوشه خالی است'}
+                 </p>
+                 {navSection !== 'trash' && <p className="text-sm mt-1">فایل‌های خود را اینجا بکشید و رها کنید</p>}
               </div>
            ) : (
              <div className="space-y-8">
@@ -401,9 +477,11 @@ export const DashboardFileManager: React.FC = () => {
                          }}
                          onDoubleClick={(e) => {
                            e.stopPropagation();
-                           setCurrentFolderId(folder.id);
-                           setSelectedItems([]);
-                           setSearchQuery('');
+                           if (navSection !== 'trash') {
+                              setCurrentFolderId(folder.id);
+                              setSelectedItems([]);
+                              setSearchQuery('');
+                           }
                          }}
                          className={`group relative bg-white p-4 rounded-xl border transition-all cursor-pointer select-none ${
                            selectedItems.includes(folder.id) 
@@ -411,7 +489,14 @@ export const DashboardFileManager: React.FC = () => {
                              : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
                          }`}
                        >
-                         <div className="flex items-center justify-between mb-3">
+                         <button 
+                           onClick={(e) => toggleStar(folder.id, e)}
+                           className={`absolute top-2 right-2 p-1 rounded-full hover:bg-slate-100 transition-colors z-10 ${folder.isStarred ? 'text-amber-400 opacity-100' : 'text-slate-300 opacity-0 group-hover:opacity-100'}`}
+                         >
+                            <Star size={14} fill={folder.isStarred ? "currentColor" : "none"} />
+                         </button>
+
+                         <div className="flex items-center justify-between mb-3 mt-2">
                            <FolderIcon color={folder.color} className="w-10 h-10" />
                            {selectedItems.includes(folder.id) && <CheckCircle size={16} className="text-blue-500" />}
                          </div>
@@ -446,6 +531,13 @@ export const DashboardFileManager: React.FC = () => {
                                : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
                            } ${clipboard?.items.includes(file.id) && clipboard.action === 'cut' ? 'opacity-50' : ''}`}
                          >
+                           <button 
+                             onClick={(e) => toggleStar(file.id, e)}
+                             className={`absolute top-2 left-2 p-1 rounded-full hover:bg-white/80 transition-colors z-20 ${file.isStarred ? 'text-amber-400 opacity-100' : 'text-slate-400 opacity-0 group-hover:opacity-100'}`}
+                           >
+                              <Star size={14} fill={file.isStarred ? "currentColor" : "none"} />
+                           </button>
+
                            <div className="aspect-square bg-slate-50 rounded-lg mb-3 flex items-center justify-center overflow-hidden relative">
                              {file.type === 'image' ? (
                                // Mock Image
@@ -456,7 +548,7 @@ export const DashboardFileManager: React.FC = () => {
                                <FileIcon type={file.type} className="w-12 h-12" />
                              )}
                              {selectedItems.includes(file.id) && (
-                               <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-0.5 shadow-sm">
+                               <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-0.5 shadow-sm z-10">
                                  <CheckCircle size={12} />
                                </div>
                              )}
@@ -496,6 +588,9 @@ export const DashboardFileManager: React.FC = () => {
                                className={`cursor-pointer transition-colors ${selectedItems.includes(file.id) ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
                              >
                                <td className="px-4 py-3 flex items-center gap-3">
+                                 <button onClick={(e) => toggleStar(file.id, e)} className={`${file.isStarred ? 'text-amber-400' : 'text-slate-300 hover:text-slate-400'}`}>
+                                    <Star size={16} fill={file.isStarred ? "currentColor" : "none"} />
+                                 </button>
                                  <FileIcon type={file.type} className="w-5 h-5" />
                                  <span className="text-slate-900 font-medium">{file.name}</span>
                                </td>
@@ -540,7 +635,7 @@ export const DashboardFileManager: React.FC = () => {
 
               <div className="p-6">
                 {/* Preview */}
-                <div className="aspect-square bg-slate-50 rounded-xl mb-6 flex items-center justify-center border border-slate-100 shadow-inner">
+                <div className="aspect-square bg-slate-50 rounded-xl mb-6 flex items-center justify-center border border-slate-100 shadow-inner relative">
                   {selectedItemDetails.type === 'folder' ? (
                     <FolderIcon color={selectedItemDetails.color} className="w-24 h-24" />
                   ) : selectedItemDetails.type === 'image' ? (
@@ -548,6 +643,14 @@ export const DashboardFileManager: React.FC = () => {
                   ) : (
                     <FileIcon type={selectedItemDetails.type} className="w-20 h-20" />
                   )}
+                  
+                  {/* Star Toggle in Inspector */}
+                  <button 
+                    onClick={(e) => toggleStar(selectedItemDetails.id, e)}
+                    className={`absolute top-2 right-2 p-2 rounded-full bg-white shadow-sm border border-slate-100 hover:bg-slate-50 transition-colors ${selectedItemDetails.isStarred ? 'text-amber-400' : 'text-slate-300'}`}
+                  >
+                     <Star size={18} fill={selectedItemDetails.isStarred ? "currentColor" : "none"} />
+                  </button>
                 </div>
 
                 {/* Basic Info */}
@@ -558,9 +661,10 @@ export const DashboardFileManager: React.FC = () => {
                       type="text" 
                       value={selectedItemDetails.name}
                       onChange={(e) => handleRename(e.target.value)}
-                      className="w-full font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-1 transition-all"
+                      disabled={navSection === 'trash'}
+                      className="w-full font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     />
-                    <Edit3 size={14} className="text-slate-400" />
+                    {navSection !== 'trash' && <Edit3 size={14} className="text-slate-400" />}
                   </div>
                 </div>
 
@@ -595,37 +699,54 @@ export const DashboardFileManager: React.FC = () => {
                     {selectedItemDetails.tags.map(tag => (
                       <span key={tag} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-bold">
                         {tag}
-                        <button onClick={() => removeTag(selectedItemDetails.id, tag)} className="hover:text-red-500"><X size={10} /></button>
+                        {navSection !== 'trash' && <button onClick={() => removeTag(selectedItemDetails.id, tag)} className="hover:text-red-500"><X size={10} /></button>}
                       </span>
                     ))}
                     {selectedItemDetails.tags.length === 0 && <span className="text-xs text-slate-400 italic">بدون برچسب</span>}
                   </div>
-                  <form onSubmit={handleAddTag} className="relative">
-                    <Tag size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                      type="text" 
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      placeholder="افزودن برچسب..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 pr-8 pl-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </form>
+                  {navSection !== 'trash' && (
+                    <form onSubmit={handleAddTag} className="relative">
+                      <Tag size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text" 
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        placeholder="افزودن برچسب..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 pr-8 pl-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </form>
+                  )}
                 </div>
 
                 {/* Actions */}
                 <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" size="sm" className="w-full text-xs">
-                    <Download size={14} className="ml-2" />
-                    دانلود
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={handleDelete}>
-                    <Trash2 size={14} className="ml-2" />
-                    حذف
-                  </Button>
-                  <Button fullWidth size="sm" className="col-span-2 text-xs shadow-none">
-                    <Eye size={14} className="ml-2" />
-                    پیش‌نمایش
-                  </Button>
+                  {navSection === 'trash' ? (
+                     <>
+                        <Button variant="outline" size="sm" className="w-full text-xs border-green-200 text-green-700 hover:bg-green-50" onClick={handleRestore}>
+                           <RefreshCw size={14} className="ml-2" />
+                           بازیابی
+                        </Button>
+                        <Button variant="outline" size="sm" className="w-full text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={handleDelete}>
+                           <Trash2 size={14} className="ml-2" />
+                           حذف دائمی
+                        </Button>
+                     </>
+                  ) : (
+                     <>
+                        <Button variant="outline" size="sm" className="w-full text-xs">
+                           <Download size={14} className="ml-2" />
+                           دانلود
+                        </Button>
+                        <Button variant="outline" size="sm" className="w-full text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={handleDelete}>
+                           <Trash2 size={14} className="ml-2" />
+                           حذف
+                        </Button>
+                        <Button fullWidth size="sm" className="col-span-2 text-xs shadow-none">
+                           <Eye size={14} className="ml-2" />
+                           پیش‌نمایش
+                        </Button>
+                     </>
+                  )}
                 </div>
               </div>
             </div>
@@ -648,7 +769,7 @@ export const DashboardFileManager: React.FC = () => {
                      placeholder="نام پوشه..." 
                      value={newFolderName}
                      onChange={(e) => setNewFolderName(e.target.value)}
-                     className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 mb-4 outline-none transition-all"
+                     className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 mb-4 outline-none transition-all text-slate-900"
                   />
                   <div className="mb-6">
                      <label className="text-xs font-bold text-slate-500 block mb-2">رنگ پوشه</label>

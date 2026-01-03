@@ -1,16 +1,17 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Folder, FileText, Image as ImageIcon, MoreVertical, Search, Plus, 
   Upload, Home, ChevronLeft, Grid, List, Trash2, FolderPlus, 
   Copy, Scissors, ClipboardPaste, Tag, Edit3, CheckCircle, File, Film, X,
-  HardDrive, Clock, Star, Cloud, Info, Download, ChevronRight, Eye, RefreshCw, AlertTriangle
+  HardDrive, Clock, Star, Cloud, Info, Download, ChevronRight, Eye, RefreshCw, AlertTriangle, Lock, Code, Check, FileCode
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { SavedTemplate, generateHtmlFromBlocks } from '../../utils/emailGenerator';
 
 // --- Types ---
-type FileType = 'folder' | 'image' | 'document' | 'video' | 'audio' | 'other';
+type FileType = 'folder' | 'image' | 'document' | 'video' | 'audio' | 'email-template' | 'other';
 
 interface FileSystemItem {
   id: string;
@@ -24,13 +25,18 @@ interface FileSystemItem {
   thumbnail?: string; // For images
   isStarred?: boolean;
   isDeleted?: boolean;
+  isLocked?: boolean;
+  templateData?: SavedTemplate;
 }
+
+const TEMPLATE_FOLDER_ID = 'email_templates_folder';
 
 // --- Mock Initial Data ---
 const initialFileSystem: FileSystemItem[] = [
   { id: '1', name: 'تصاویر کمپین', type: 'folder', parentId: null, date: '1402/09/01', tags: ['مهم'], color: 'blue', isStarred: true, isDeleted: false },
   { id: '2', name: 'اسناد اداری', type: 'folder', parentId: null, date: '1402/08/15', tags: [], color: 'slate', isStarred: false, isDeleted: false },
   { id: '3', name: 'ویدیوهای آموزشی', type: 'folder', parentId: null, date: '1402/09/10', tags: ['ویدیو'], color: 'red', isStarred: false, isDeleted: false },
+  { id: TEMPLATE_FOLDER_ID, name: 'قالب‌های ایمیل شما', type: 'folder', parentId: null, date: '1402/10/01', tags: ['سیستمی'], color: 'purple', isStarred: false, isDeleted: false, isLocked: true },
   { id: '4', name: 'logo_v1.png', type: 'image', parentId: '1', size: '2.4 MB', date: '1402/09/02', tags: ['برندینگ'], isStarred: false, isDeleted: false },
   { id: '5', name: 'banner_yalda.jpg', type: 'image', parentId: '1', size: '1.1 MB', date: '1402/09/20', tags: ['یلدا'], isStarred: true, isDeleted: false },
   { id: '6', name: 'contract_template.pdf', type: 'document', parentId: '2', size: '450 KB', date: '1402/08/20', tags: ['قرارداد'], isStarred: false, isDeleted: false },
@@ -46,6 +52,68 @@ const FOLDER_COLORS = [
   { name: 'بنفش', value: 'purple', class: 'bg-purple-500 text-white' },
   { name: 'خاکستری', value: 'slate', class: 'bg-slate-500 text-white' },
 ];
+
+// --- Sub-components ---
+
+const FolderIcon = ({ color = 'blue', className = '', isLocked = false }: { color?: string, className?: string, isLocked?: boolean }) => {
+  const colorMap: Record<string, string> = {
+    blue: 'text-blue-500 fill-blue-500',
+    red: 'text-red-500 fill-red-500',
+    green: 'text-green-500 fill-green-500',
+    amber: 'text-amber-500 fill-amber-500',
+    purple: 'text-purple-500 fill-purple-500',
+    slate: 'text-slate-500 fill-slate-500',
+  };
+  return (
+    <div className="relative">
+       <Folder className={`${colorMap[color] || colorMap['blue']} ${className}`} />
+       {isLocked && <Lock size={12} className="absolute bottom-1 right-1 text-white bg-black/20 rounded-full p-0.5" />}
+    </div>
+  );
+};
+
+const FileIcon = ({ type, className = '' }: { type: FileType, className?: string }) => {
+  if (type === 'image') return <ImageIcon className={`text-purple-500 ${className}`} />;
+  if (type === 'video') return <Film className={`text-red-500 ${className}`} />;
+  if (type === 'document') return <FileText className={`text-blue-500 ${className}`} />;
+  if (type === 'email-template') return <FileCode className={`text-orange-500 ${className}`} />;
+  return <File className={`text-slate-400 ${className}`} />;
+};
+
+const FilePreview = ({ item, className = "" }: { item: FileSystemItem, className?: string }) => {
+  if (item.type === 'email-template') {
+     return (
+        <div className={`w-full h-full bg-gradient-to-br from-orange-50 to-orange-100/50 flex flex-col items-center justify-center text-orange-500 ${className}`}>
+           <div className="bg-white p-3 rounded-2xl shadow-sm border border-orange-100 mb-2">
+              <FileCode size={32} />
+           </div>
+           <span className="text-[10px] font-bold text-orange-700/70 tracking-wider uppercase">HTML Template</span>
+        </div>
+     );
+  }
+  
+  if (item.type === 'image') {
+     return (
+        <div className={`w-full h-full bg-slate-100 flex items-center justify-center text-slate-400 ${className}`}>
+           <ImageIcon size={32} />
+        </div>
+     );
+  }
+
+  if (item.type === 'folder') {
+     return (
+       <div className={`w-full h-full flex items-center justify-center ${className}`}>
+          <FolderIcon color={item.color} className="w-16 h-16" isLocked={item.isLocked} />
+       </div>
+     );
+  }
+
+  return (
+     <div className={`w-full h-full bg-slate-50 flex items-center justify-center text-slate-400 ${className}`}>
+        <FileIcon type={item.type} className="w-12 h-12" />
+     </div>
+  );
+};
 
 export const DashboardFileManager: React.FC = () => {
   const [items, setItems] = useState<FileSystemItem[]>(initialFileSystem);
@@ -64,9 +132,48 @@ export const DashboardFileManager: React.FC = () => {
   const [newFolderColor, setNewFolderColor] = useState('blue');
   const [tagInput, setTagInput] = useState('');
 
+  // Preview & Copy
+  const [previewItem, setPreviewItem] = useState<FileSystemItem | null>(null);
+  const [showCodeCopied, setShowCodeCopied] = useState(false);
+
   // Upload Simulation
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Effects ---
+  useEffect(() => {
+    // Sync with localStorage email templates
+    const syncTemplates = () => {
+      const savedTemplates: SavedTemplate[] = JSON.parse(localStorage.getItem('peiksa_email_templates') || '[]');
+      
+      setItems(prevItems => {
+        // Remove existing templates to avoid duplicates during re-sync
+        const nonTemplateItems = prevItems.filter(item => item.parentId !== TEMPLATE_FOLDER_ID);
+        
+        // Ensure the folder exists
+        const hasFolder = nonTemplateItems.find(i => i.id === TEMPLATE_FOLDER_ID);
+        if (!hasFolder) {
+           nonTemplateItems.push({ id: TEMPLATE_FOLDER_ID, name: 'قالب‌های ایمیل شما', type: 'folder', parentId: null, date: '1402/10/01', tags: ['سیستمی'], color: 'purple', isStarred: false, isDeleted: false, isLocked: true });
+        }
+
+        const templateItems: FileSystemItem[] = savedTemplates.map(t => ({
+          id: `template-${t.id}`,
+          name: t.name,
+          type: 'email-template',
+          parentId: TEMPLATE_FOLDER_ID,
+          date: t.date,
+          tags: ['قالب'],
+          isStarred: false,
+          isDeleted: false,
+          templateData: t
+        }));
+
+        return [...nonTemplateItems, ...templateItems];
+      });
+    };
+
+    syncTemplates();
+  }, []);
 
   // --- Derived State ---
   const currentFolder = items.find(i => i.id === currentFolderId);
@@ -84,28 +191,12 @@ export const DashboardFileManager: React.FC = () => {
   }
 
   const filteredItems = items.filter(item => {
-    // 1. Trash Filter (Global)
-    if (navSection === 'trash') {
-      return item.isDeleted;
-    }
-    // Don't show deleted items in other views
+    if (navSection === 'trash') return item.isDeleted;
     if (item.isDeleted) return false;
-
-    // 2. Favorites Filter
-    if (navSection === 'favorites') {
-      return item.isStarred;
-    }
-
-    // 3. Recent Filter (Mock)
-    if (navSection === 'recent') {
-       return true; 
-    }
+    if (navSection === 'favorites') return item.isStarred;
+    if (navSection === 'recent') return true; 
     
-    // 4. Folder Navigation (Default View)
-    // Only filter by parentId if we are in 'all' view AND not searching
     const isParentMatch = searchQuery ? true : item.parentId === currentFolderId;
-    
-    // 5. Search Query
     const isNameMatch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     
     return isParentMatch && isNameMatch;
@@ -166,18 +257,34 @@ export const DashboardFileManager: React.FC = () => {
 
   const handleRename = (newName: string) => {
     if (!selectedItemDetails) return;
+    if (selectedItemDetails.isLocked) {
+      alert('این آیتم قابل تغییر نام نیست.');
+      return;
+    }
     setItems(items.map(i => i.id === selectedItemDetails.id ? { ...i, name: newName } : i));
   };
 
   const handleDelete = () => {
+    const hasLocked = selectedItems.some(id => items.find(i => i.id === id)?.isLocked);
+    if (hasLocked) {
+      alert('برخی از آیتم‌های انتخاب شده سیستمی هستند و قابل حذف نیستند.');
+      return;
+    }
+
     if (navSection === 'trash') {
       if (confirm('آیا از حذف دائمی این موارد اطمینان دارید؟ این عملیات قابل بازگشت نیست.')) {
         const idsToDelete = new Set(selectedItems);
+        // Also remove from localStorage if it's a template
+        const templatesToDelete = items.filter(i => idsToDelete.has(i.id) && i.type === 'email-template');
+        if (templatesToDelete.length > 0) {
+           const savedTemplates: SavedTemplate[] = JSON.parse(localStorage.getItem('peiksa_email_templates') || '[]');
+           const newSaved = savedTemplates.filter(t => !templatesToDelete.some(del => del.templateData?.id === t.id));
+           localStorage.setItem('peiksa_email_templates', JSON.stringify(newSaved));
+        }
         setItems(items.filter(i => !idsToDelete.has(i.id)));
         setSelectedItems([]);
       }
     } else {
-      // Soft Delete
       const idsToDelete = new Set(selectedItems);
       setItems(items.map(i => idsToDelete.has(i.id) ? { ...i, isDeleted: true } : i));
       setSelectedItems([]);
@@ -201,12 +308,18 @@ export const DashboardFileManager: React.FC = () => {
   };
 
   const handleCut = () => {
+    const hasLocked = selectedItems.some(id => items.find(i => i.id === id)?.isLocked);
+    if (hasLocked) return;
     setClipboard({ action: 'cut', items: [...selectedItems] });
     setSelectedItems([]);
   };
 
   const handlePaste = () => {
     if (!clipboard) return;
+    if (currentFolderId === TEMPLATE_FOLDER_ID) {
+       alert('نمی‌توانید در این پوشه فایل اضافه کنید.');
+       return;
+    }
     
     if (clipboard.action === 'cut') {
       setItems(items.map(i => clipboard.items.includes(i.id) ? { ...i, parentId: currentFolderId } : i));
@@ -234,26 +347,11 @@ export const DashboardFileManager: React.FC = () => {
     setItems(items.map(i => i.id === itemId ? { ...i, tags: i.tags.filter(t => t !== tagToRemove) } : i));
   };
 
-  // --- Visual Components ---
-
-  const FolderIcon = ({ color = 'blue', className = '' }: { color?: string, className?: string }) => {
-    // Using CSS colors mapping
-    const colorMap: Record<string, string> = {
-      blue: 'text-blue-500 fill-blue-500',
-      red: 'text-red-500 fill-red-500',
-      green: 'text-green-500 fill-green-500',
-      amber: 'text-amber-500 fill-amber-500',
-      purple: 'text-purple-500 fill-purple-500',
-      slate: 'text-slate-500 fill-slate-500',
-    };
-    return <Folder className={`${colorMap[color] || colorMap['blue']} ${className}`} />;
-  };
-
-  const FileIcon = ({ type, className = '' }: { type: FileType, className?: string }) => {
-    if (type === 'image') return <ImageIcon className={`text-purple-500 ${className}`} />;
-    if (type === 'video') return <Film className={`text-red-500 ${className}`} />;
-    if (type === 'document') return <FileText className={`text-blue-500 ${className}`} />;
-    return <File className={`text-slate-400 ${className}`} />;
+  const handleCopyCode = (template: SavedTemplate) => {
+    const html = generateHtmlFromBlocks(template.blocks);
+    navigator.clipboard.writeText(html);
+    setShowCodeCopied(true);
+    setTimeout(() => setShowCodeCopied(false), 2000);
   };
 
   return (
@@ -315,7 +413,7 @@ export const DashboardFileManager: React.FC = () => {
           <div className="mt-8">
             <h4 className="text-xs font-bold text-slate-400 uppercase mb-4 px-2">دسته‌بندی‌ها</h4>
             <div className="space-y-1">
-              {['تصاویر', 'ویدیوها', 'اسناد', 'صوتی'].map((cat) => (
+              {['تصاویر', 'ویدیوها', 'اسناد', 'صوتی', 'قالب‌ها'].map((cat) => (
                 <button key={cat} className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                   <span>{cat}</span>
                   <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-md text-slate-500">24</span>
@@ -497,7 +595,7 @@ export const DashboardFileManager: React.FC = () => {
                          </button>
 
                          <div className="flex items-center justify-between mb-3 mt-2">
-                           <FolderIcon color={folder.color} className="w-10 h-10" />
+                           <FolderIcon color={folder.color} className="w-10 h-10" isLocked={folder.isLocked} />
                            {selectedItems.includes(folder.id) && <CheckCircle size={16} className="text-blue-500" />}
                          </div>
                          <div className="font-bold text-slate-700 text-sm truncate">{folder.name}</div>
@@ -539,14 +637,7 @@ export const DashboardFileManager: React.FC = () => {
                            </button>
 
                            <div className="aspect-square bg-slate-50 rounded-lg mb-3 flex items-center justify-center overflow-hidden relative">
-                             {file.type === 'image' ? (
-                               // Mock Image
-                               <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400">
-                                  <ImageIcon size={32} />
-                               </div>
-                             ) : (
-                               <FileIcon type={file.type} className="w-12 h-12" />
-                             )}
+                             <FilePreview item={file} />
                              {selectedItems.includes(file.id) && (
                                <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-0.5 shadow-sm z-10">
                                  <CheckCircle size={12} />
@@ -635,19 +726,13 @@ export const DashboardFileManager: React.FC = () => {
 
               <div className="p-6">
                 {/* Preview */}
-                <div className="aspect-square bg-slate-50 rounded-xl mb-6 flex items-center justify-center border border-slate-100 shadow-inner relative">
-                  {selectedItemDetails.type === 'folder' ? (
-                    <FolderIcon color={selectedItemDetails.color} className="w-24 h-24" />
-                  ) : selectedItemDetails.type === 'image' ? (
-                    <ImageIcon className="w-20 h-20 text-purple-400" />
-                  ) : (
-                    <FileIcon type={selectedItemDetails.type} className="w-20 h-20" />
-                  )}
+                <div className="aspect-square bg-slate-50 rounded-xl mb-6 flex items-center justify-center border border-slate-100 shadow-inner relative overflow-hidden group">
+                  <FilePreview item={selectedItemDetails} />
                   
                   {/* Star Toggle in Inspector */}
                   <button 
                     onClick={(e) => toggleStar(selectedItemDetails.id, e)}
-                    className={`absolute top-2 right-2 p-2 rounded-full bg-white shadow-sm border border-slate-100 hover:bg-slate-50 transition-colors ${selectedItemDetails.isStarred ? 'text-amber-400' : 'text-slate-300'}`}
+                    className={`absolute top-2 right-2 p-2 rounded-full bg-white shadow-sm border border-slate-100 hover:bg-slate-50 transition-colors z-20 ${selectedItemDetails.isStarred ? 'text-amber-400' : 'text-slate-300'}`}
                   >
                      <Star size={18} fill={selectedItemDetails.isStarred ? "currentColor" : "none"} />
                   </button>
@@ -661,10 +746,10 @@ export const DashboardFileManager: React.FC = () => {
                       type="text" 
                       value={selectedItemDetails.name}
                       onChange={(e) => handleRename(e.target.value)}
-                      disabled={navSection === 'trash'}
+                      disabled={navSection === 'trash' || selectedItemDetails.isLocked}
                       className="w-full font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none py-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     />
-                    {navSection !== 'trash' && <Edit3 size={14} className="text-slate-400" />}
+                    {navSection !== 'trash' && !selectedItemDetails.isLocked && <Edit3 size={14} className="text-slate-400" />}
                   </div>
                 </div>
 
@@ -699,7 +784,7 @@ export const DashboardFileManager: React.FC = () => {
                     {selectedItemDetails.tags.map(tag => (
                       <span key={tag} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-bold">
                         {tag}
-                        {navSection !== 'trash' && <button onClick={() => removeTag(selectedItemDetails.id, tag)} className="hover:text-red-500"><X size={10} /></button>}
+                        {navSection !== 'trash' && !selectedItemDetails.isLocked && <button onClick={() => removeTag(selectedItemDetails.id, tag)} className="hover:text-red-500"><X size={10} /></button>}
                       </span>
                     ))}
                     {selectedItemDetails.tags.length === 0 && <span className="text-xs text-slate-400 italic">بدون برچسب</span>}
@@ -737,14 +822,29 @@ export const DashboardFileManager: React.FC = () => {
                            <Download size={14} className="ml-2" />
                            دانلود
                         </Button>
-                        <Button variant="outline" size="sm" className="w-full text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={handleDelete}>
+                        <Button variant="outline" size="sm" className="w-full text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={handleDelete} disabled={selectedItemDetails.isLocked}>
                            <Trash2 size={14} className="ml-2" />
                            حذف
                         </Button>
-                        <Button fullWidth size="sm" className="col-span-2 text-xs shadow-none">
-                           <Eye size={14} className="ml-2" />
-                           پیش‌نمایش
-                        </Button>
+                        
+                        {/* Custom Actions for Email Template */}
+                        {selectedItemDetails.type === 'email-template' && selectedItemDetails.templateData ? (
+                           <div className="col-span-2 grid grid-cols-2 gap-3 mt-1">
+                              <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleCopyCode(selectedItemDetails.templateData!)}>
+                                 {showCodeCopied ? <Check size={14} className="ml-2 text-green-600" /> : <Code size={14} className="ml-2" />}
+                                 {showCodeCopied ? 'کپی شد' : 'کپی کد HTML'}
+                              </Button>
+                              <Button fullWidth size="sm" className="text-xs shadow-none bg-blue-600 text-white hover:bg-blue-700 border-none" onClick={() => setPreviewItem(selectedItemDetails)}>
+                                 <Eye size={14} className="ml-2" />
+                                 پیش‌نمایش کامل
+                              </Button>
+                           </div>
+                        ) : (
+                           <Button fullWidth size="sm" className="col-span-2 text-xs shadow-none">
+                              <Eye size={14} className="ml-2" />
+                              پیش‌نمایش
+                           </Button>
+                        )}
                      </>
                   )}
                 </div>
@@ -792,6 +892,44 @@ export const DashboardFileManager: React.FC = () => {
                </motion.div>
             </div>
          )}
+      </AnimatePresence>
+
+      {/* --- Preview Modal --- */}
+      <AnimatePresence>
+        {previewItem && previewItem.templateData && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-10 bg-slate-900/80 backdrop-blur-sm" onClick={() => setPreviewItem(null)}>
+             <motion.div 
+               initial={{ scale: 0.95, opacity: 0 }} 
+               animate={{ scale: 1, opacity: 1 }} 
+               exit={{ scale: 0.95, opacity: 0 }}
+               className="bg-white w-full max-w-4xl h-full max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+               onClick={(e) => e.stopPropagation()}
+             >
+                <div className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-slate-50">
+                   <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                      <Eye size={18} className="text-blue-600" />
+                      پیش‌نمایش: {previewItem.name}
+                   </h3>
+                   <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleCopyCode(previewItem.templateData!)}>
+                         {showCodeCopied ? <Check size={16} /> : <Code size={16} />}
+                         {showCodeCopied ? 'کپی شد' : 'کپی کد'}
+                      </Button>
+                      <button onClick={() => setPreviewItem(null)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
+                         <X size={20} className="text-slate-500" />
+                      </button>
+                   </div>
+                </div>
+                <div className="flex-1 bg-slate-100 relative">
+                   <iframe 
+                      srcDoc={generateHtmlFromBlocks(previewItem.templateData.blocks)}
+                      className="w-full h-full border-none"
+                      title="Full Preview"
+                   />
+                </div>
+             </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
     </div>

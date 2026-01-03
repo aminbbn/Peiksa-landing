@@ -59,10 +59,15 @@ export interface Customer {
   name: string;
   email: string;
   phone: string;
-  status: 'active' | 'inactive' | 'lead';
-  spent: number;
-  lastSeen: string;
+  isEmailable: boolean;
+  lastEmailSent?: string; // Date string
+  language: string;
+  gender: 'Male' | 'Female' | 'Other';
+  nationality: string;
+  address1: string;
+  address2?: string;
   tags: string[];
+  status?: 'active' | 'inactive' | 'lead'; // Kept for internal logic if needed
 }
 
 export interface Campaign {

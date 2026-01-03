@@ -2373,7 +2373,7 @@ export const DashboardEmailBuilder: React.FC = () => {
                         {/* General Link Field for All Non-Header Blocks */}
                         <div>
                            <label className="text-xs font-bold text-slate-700 mb-1 block">
-                             {selectedBlock.type === 'footer' ? 'لینک عمومی (اختیاری)' : 'لینک مقصد'}
+                             لینک مقصد
                            </label>
                            <input 
                              type="text" dir="ltr"

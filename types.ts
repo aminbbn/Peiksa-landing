@@ -56,18 +56,36 @@ export enum PageRoute {
 // Dashboard Types
 export interface Customer {
   id: string;
-  name: string;
-  email: string;
-  phone: string;
-  isEmailable: boolean;
-  lastEmailSent?: string; // Date string
-  language: string;
-  gender: 'Male' | 'Female' | 'Other';
-  nationality: string;
-  address1: string;
-  address2?: string;
-  tags: string[];
-  status?: 'active' | 'inactive' | 'lead'; // Kept for internal logic if needed
+  firstName: string; // 1
+  lastName: string; // 2
+  phone: string; // 3
+  email: string; // 4
+  isEmailable: boolean; // 5
+  
+  // Communication Stats
+  lastEmailDate?: string; // 6
+  lastEmailSubject?: string; // 7
+  lastSmsDate?: string; // 8
+  lastSmsSubject?: string; // 9
+  
+  // Demographics
+  language: string; // 10
+  gender: 'Male' | 'Female' | 'Other'; // 11
+  nationality: string; // 12
+  
+  // Address
+  address1?: string; // 13
+  address2?: string; // 14
+  workAddress?: string; // 15
+  
+  // Segmentation
+  tags: string[]; // 16
+  interestScore: number; // 17
+  
+  // System
+  group: string;
+  status: 'active' | 'inactive' | 'lead';
+  avatar?: string;
 }
 
 export interface Campaign {

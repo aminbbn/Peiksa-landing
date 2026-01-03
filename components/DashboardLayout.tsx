@@ -73,9 +73,9 @@ export const DashboardLayout: React.FC = () => {
             })}
           </nav>
 
-          {/* User Profile & Logout */}
-          <div className="p-4 border-t border-slate-100">
-            <div className="bg-slate-50 rounded-xl p-4 mb-2 flex items-center gap-3">
+          {/* User Profile */}
+          <div className="px-4 pt-4 border-t border-slate-100">
+            <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20">
                 {user.name.charAt(0)}
               </div>
@@ -84,6 +84,10 @@ export const DashboardLayout: React.FC = () => {
                 <p className="text-xs text-slate-500 truncate">{user.email}</p>
               </div>
             </div>
+          </div>
+
+          {/* Logout Button */}
+          <div className="p-4">
             <button 
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 py-3 rounded-xl transition-colors text-sm font-bold"

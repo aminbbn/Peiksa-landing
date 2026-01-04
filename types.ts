@@ -50,6 +50,7 @@ export enum PageRoute {
   DASHBOARD_ANALYTICS = '/dashboard/analytics',
   DASHBOARD_SETTINGS = '/dashboard/settings',
   DASHBOARD_EMAIL_BUILDER = '/dashboard/email-builder',
+  DASHBOARD_SMS_BUILDER = '/dashboard/sms-builder',
   DASHBOARD_FILES = '/dashboard/files',
 }
 

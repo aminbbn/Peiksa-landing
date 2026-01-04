@@ -5,13 +5,24 @@ import {
   Folder, FileText, Image as ImageIcon, MoreVertical, Search, Plus, 
   Upload, Home, ChevronLeft, Grid, List, Trash2, FolderPlus, 
   Copy, Scissors, ClipboardPaste, Tag, Edit3, CheckCircle, File, Film, X,
-  HardDrive, Clock, Star, Cloud, Info, Download, ChevronRight, Eye, RefreshCw, AlertTriangle, Lock, Code, Check, FileCode
+  HardDrive, Clock, Star, Cloud, Info, Download, ChevronRight, Eye, RefreshCw, AlertTriangle, Lock, Code, Check, FileCode, MessageSquare
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { SavedTemplate, generateHtmlFromBlocks } from '../../utils/emailGenerator';
+import { PhoneMockup, ChatBubble } from '../../components/dashboard/PhoneMockup';
 
 // --- Types ---
-type FileType = 'folder' | 'image' | 'document' | 'video' | 'audio' | 'email-template' | 'other';
+type FileType = 'folder' | 'image' | 'document' | 'video' | 'audio' | 'email-template' | 'sms-template' | 'other';
+
+interface SmsTemplate {
+  id: string;
+  subject: string;
+  text: string;
+  description: string;
+  tags: string[];
+  tone: string;
+  date: string;
+}
 
 interface FileSystemItem {
   id: string;
@@ -27,16 +38,19 @@ interface FileSystemItem {
   isDeleted?: boolean;
   isLocked?: boolean;
   templateData?: SavedTemplate;
+  smsData?: SmsTemplate;
 }
 
 const TEMPLATE_FOLDER_ID = 'email_templates_folder';
+const SMS_FOLDER_ID = 'sms_templates_folder';
 
 // --- Mock Initial Data ---
 const initialFileSystem: FileSystemItem[] = [
   { id: '1', name: 'تصاویر کمپین', type: 'folder', parentId: null, date: '1402/09/01', tags: ['مهم'], color: 'blue', isStarred: true, isDeleted: false },
   { id: '2', name: 'اسناد اداری', type: 'folder', parentId: null, date: '1402/08/15', tags: [], color: 'slate', isStarred: false, isDeleted: false },
   { id: '3', name: 'ویدیوهای آموزشی', type: 'folder', parentId: null, date: '1402/09/10', tags: ['ویدیو'], color: 'red', isStarred: false, isDeleted: false },
-  { id: TEMPLATE_FOLDER_ID, name: 'قالب‌های ایمیل شما', type: 'folder', parentId: null, date: '1402/10/01', tags: ['سیستمی'], color: 'purple', isStarred: false, isDeleted: false, isLocked: true },
+  { id: TEMPLATE_FOLDER_ID, name: 'قالب‌های ایمیل', type: 'folder', parentId: null, date: '1402/10/01', tags: ['سیستمی'], color: 'purple', isStarred: false, isDeleted: false, isLocked: true },
+  { id: SMS_FOLDER_ID, name: 'قالب‌های پیامک', type: 'folder', parentId: null, date: '1402/10/05', tags: ['سیستمی'], color: 'green', isStarred: false, isDeleted: false, isLocked: true },
   { id: '4', name: 'logo_v1.png', type: 'image', parentId: '1', size: '2.4 MB', date: '1402/09/02', tags: ['برندینگ'], isStarred: false, isDeleted: false },
   { id: '5', name: 'banner_yalda.jpg', type: 'image', parentId: '1', size: '1.1 MB', date: '1402/09/20', tags: ['یلدا'], isStarred: true, isDeleted: false },
   { id: '6', name: 'contract_template.pdf', type: 'document', parentId: '2', size: '450 KB', date: '1402/08/20', tags: ['قرارداد'], isStarred: false, isDeleted: false },
@@ -77,6 +91,7 @@ const FileIcon = ({ type, className = '' }: { type: FileType, className?: string
   if (type === 'video') return <Film className={`text-red-500 ${className}`} />;
   if (type === 'document') return <FileText className={`text-blue-500 ${className}`} />;
   if (type === 'email-template') return <FileCode className={`text-orange-500 ${className}`} />;
+  if (type === 'sms-template') return <MessageSquare className={`text-green-500 ${className}`} />;
   return <File className={`text-slate-400 ${className}`} />;
 };
 
@@ -88,6 +103,17 @@ const FilePreview = ({ item, className = "" }: { item: FileSystemItem, className
               <FileCode size={32} />
            </div>
            <span className="text-[10px] font-bold text-orange-700/70 tracking-wider uppercase">HTML Template</span>
+        </div>
+     );
+  }
+
+  if (item.type === 'sms-template') {
+     return (
+        <div className={`w-full h-full bg-gradient-to-br from-green-50 to-green-100/50 flex flex-col items-center justify-center text-green-600 ${className}`}>
+           <div className="bg-white p-3 rounded-2xl shadow-sm border border-green-100 mb-2">
+              <MessageSquare size={32} />
+           </div>
+           <span className="text-[10px] font-bold text-green-700/70 tracking-wider uppercase">SMS Template</span>
         </div>
      );
   }
@@ -142,22 +168,29 @@ export const DashboardFileManager: React.FC = () => {
 
   // --- Effects ---
   useEffect(() => {
-    // Sync with localStorage email templates
+    // Sync with localStorage templates
     const syncTemplates = () => {
-      const savedTemplates: SavedTemplate[] = JSON.parse(localStorage.getItem('peiksa_email_templates') || '[]');
+      const savedEmailTemplates: SavedTemplate[] = JSON.parse(localStorage.getItem('peiksa_email_templates') || '[]');
+      const savedSmsTemplates: SmsTemplate[] = JSON.parse(localStorage.getItem('peiksa_saved_sms') || '[]');
       
       setItems(prevItems => {
         // Remove existing templates to avoid duplicates during re-sync
-        const nonTemplateItems = prevItems.filter(item => item.parentId !== TEMPLATE_FOLDER_ID);
+        const nonTemplateItems = prevItems.filter(item => 
+            item.parentId !== TEMPLATE_FOLDER_ID && item.parentId !== SMS_FOLDER_ID
+        );
         
-        // Ensure the folder exists
-        const hasFolder = nonTemplateItems.find(i => i.id === TEMPLATE_FOLDER_ID);
-        if (!hasFolder) {
-           nonTemplateItems.push({ id: TEMPLATE_FOLDER_ID, name: 'قالب‌های ایمیل شما', type: 'folder', parentId: null, date: '1402/10/01', tags: ['سیستمی'], color: 'purple', isStarred: false, isDeleted: false, isLocked: true });
+        // Ensure the Email folder exists
+        if (!nonTemplateItems.find(i => i.id === TEMPLATE_FOLDER_ID)) {
+           nonTemplateItems.push({ id: TEMPLATE_FOLDER_ID, name: 'قالب‌های ایمیل', type: 'folder', parentId: null, date: '1402/10/01', tags: ['سیستمی'], color: 'purple', isStarred: false, isDeleted: false, isLocked: true });
         }
 
-        const templateItems: FileSystemItem[] = savedTemplates.map(t => ({
-          id: `template-${t.id}`,
+        // Ensure the SMS folder exists
+        if (!nonTemplateItems.find(i => i.id === SMS_FOLDER_ID)) {
+           nonTemplateItems.push({ id: SMS_FOLDER_ID, name: 'قالب‌های پیامک', type: 'folder', parentId: null, date: '1402/10/05', tags: ['سیستمی'], color: 'green', isStarred: false, isDeleted: false, isLocked: true });
+        }
+
+        const emailItems: FileSystemItem[] = savedEmailTemplates.map(t => ({
+          id: `template-email-${t.id}`,
           name: t.name,
           type: 'email-template',
           parentId: TEMPLATE_FOLDER_ID,
@@ -168,7 +201,19 @@ export const DashboardFileManager: React.FC = () => {
           templateData: t
         }));
 
-        return [...nonTemplateItems, ...templateItems];
+        const smsItems: FileSystemItem[] = savedSmsTemplates.map(t => ({
+          id: `template-sms-${t.id}`,
+          name: t.subject || 'بدون عنوان',
+          type: 'sms-template',
+          parentId: SMS_FOLDER_ID,
+          date: t.date,
+          tags: t.tags || ['قالب'],
+          isStarred: false,
+          isDeleted: false,
+          smsData: t
+        }));
+
+        return [...nonTemplateItems, ...emailItems, ...smsItems];
       });
     };
 
@@ -274,13 +319,23 @@ export const DashboardFileManager: React.FC = () => {
     if (navSection === 'trash') {
       if (confirm('آیا از حذف دائمی این موارد اطمینان دارید؟ این عملیات قابل بازگشت نیست.')) {
         const idsToDelete = new Set(selectedItems);
-        // Also remove from localStorage if it's a template
-        const templatesToDelete = items.filter(i => idsToDelete.has(i.id) && i.type === 'email-template');
-        if (templatesToDelete.length > 0) {
+        
+        // Remove Email templates from localStorage
+        const emailTemplatesToDelete = items.filter(i => idsToDelete.has(i.id) && i.type === 'email-template');
+        if (emailTemplatesToDelete.length > 0) {
            const savedTemplates: SavedTemplate[] = JSON.parse(localStorage.getItem('peiksa_email_templates') || '[]');
-           const newSaved = savedTemplates.filter(t => !templatesToDelete.some(del => del.templateData?.id === t.id));
+           const newSaved = savedTemplates.filter(t => !emailTemplatesToDelete.some(del => del.templateData?.id === t.id));
            localStorage.setItem('peiksa_email_templates', JSON.stringify(newSaved));
         }
+
+        // Remove SMS templates from localStorage
+        const smsTemplatesToDelete = items.filter(i => idsToDelete.has(i.id) && i.type === 'sms-template');
+        if (smsTemplatesToDelete.length > 0) {
+           const savedSms: SmsTemplate[] = JSON.parse(localStorage.getItem('peiksa_saved_sms') || '[]');
+           const newSavedSms = savedSms.filter(t => !smsTemplatesToDelete.some(del => del.smsData?.id === t.id));
+           localStorage.setItem('peiksa_saved_sms', JSON.stringify(newSavedSms));
+        }
+
         setItems(items.filter(i => !idsToDelete.has(i.id)));
         setSelectedItems([]);
       }
@@ -316,7 +371,7 @@ export const DashboardFileManager: React.FC = () => {
 
   const handlePaste = () => {
     if (!clipboard) return;
-    if (currentFolderId === TEMPLATE_FOLDER_ID) {
+    if (currentFolderId === TEMPLATE_FOLDER_ID || currentFolderId === SMS_FOLDER_ID) {
        alert('نمی‌توانید در این پوشه فایل اضافه کنید.');
        return;
     }
@@ -839,6 +894,13 @@ export const DashboardFileManager: React.FC = () => {
                                  پیش‌نمایش کامل
                               </Button>
                            </div>
+                        ) : selectedItemDetails.type === 'sms-template' && selectedItemDetails.smsData ? (
+                           <div className="col-span-2 mt-1">
+                              <Button fullWidth size="sm" className="text-xs shadow-none bg-blue-600 text-white hover:bg-blue-700 border-none" onClick={() => setPreviewItem(selectedItemDetails)}>
+                                 <Eye size={14} className="ml-2" />
+                                 پیش‌نمایش در موبایل
+                              </Button>
+                           </div>
                         ) : (
                            <Button fullWidth size="sm" className="col-span-2 text-xs shadow-none">
                               <Eye size={14} className="ml-2" />
@@ -896,7 +958,7 @@ export const DashboardFileManager: React.FC = () => {
 
       {/* --- Preview Modal --- */}
       <AnimatePresence>
-        {previewItem && previewItem.templateData && (
+        {previewItem && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-10 bg-slate-900/80 backdrop-blur-sm" onClick={() => setPreviewItem(null)}>
              <motion.div 
                initial={{ scale: 0.95, opacity: 0 }} 
@@ -905,28 +967,48 @@ export const DashboardFileManager: React.FC = () => {
                className="bg-white w-full max-w-4xl h-full max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
                onClick={(e) => e.stopPropagation()}
              >
-                <div className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-slate-50">
+                <div className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-slate-50 shrink-0">
                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
                       <Eye size={18} className="text-blue-600" />
                       پیش‌نمایش: {previewItem.name}
                    </h3>
                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleCopyCode(previewItem.templateData!)}>
-                         {showCodeCopied ? <Check size={16} /> : <Code size={16} />}
-                         {showCodeCopied ? 'کپی شد' : 'کپی کد'}
-                      </Button>
+                      {previewItem.type === 'email-template' && previewItem.templateData && (
+                        <Button size="sm" variant="outline" onClick={() => handleCopyCode(previewItem.templateData!)}>
+                           {showCodeCopied ? <Check size={16} /> : <Code size={16} />}
+                           {showCodeCopied ? 'کپی شد' : 'کپی کد'}
+                        </Button>
+                      )}
                       <button onClick={() => setPreviewItem(null)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
                          <X size={20} className="text-slate-500" />
                       </button>
                    </div>
                 </div>
-                <div className="flex-1 bg-slate-100 relative">
-                   <iframe 
-                      srcDoc={generateHtmlFromBlocks(previewItem.templateData.blocks)}
-                      className="w-full h-full border-none"
-                      title="Full Preview"
-                   />
-                </div>
+                
+                {/* Email Preview */}
+                {previewItem.type === 'email-template' && previewItem.templateData && (
+                   <div className="flex-1 bg-slate-100 relative">
+                      <iframe 
+                         srcDoc={generateHtmlFromBlocks(previewItem.templateData.blocks)}
+                         className="w-full h-full border-none"
+                         title="Full Preview"
+                      />
+                   </div>
+                )}
+
+                {/* SMS Preview */}
+                {previewItem.type === 'sms-template' && previewItem.smsData && (
+                   <div className="flex-1 bg-slate-200 relative flex items-center justify-center p-8 overflow-y-auto">
+                      <PhoneMockup>
+                         <ChatBubble isSender={false}>
+                            سلام! متن پیامک شما به شرح زیر است:
+                         </ChatBubble>
+                         <ChatBubble isSender={true} status="Delivered">
+                            {previewItem.smsData.text}
+                         </ChatBubble>
+                      </PhoneMockup>
+                   </div>
+                )}
              </motion.div>
           </div>
         )}

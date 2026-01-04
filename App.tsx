@@ -19,6 +19,7 @@ import { DashboardCRM } from './pages/dashboard/CRM';
 import { DashboardCampaigns } from './pages/dashboard/Campaigns';
 import { DashboardAnalytics } from './pages/dashboard/Analytics';
 import { DashboardEmailBuilder } from './pages/dashboard/EmailBuilder';
+import { DashboardSmsBuilder } from './pages/dashboard/SmsBuilder';
 import { DashboardFileManager } from './pages/dashboard/FileManager';
 import { PageRoute } from './types';
 
@@ -90,6 +91,7 @@ const App: React.FC = () => {
           <Route path="crm" element={<DashboardCRM />} />
           <Route path="campaigns" element={<DashboardCampaigns />} />
           <Route path="email-builder" element={<DashboardEmailBuilder />} />
+          <Route path="sms-builder" element={<DashboardSmsBuilder />} />
           <Route path="files" element={<DashboardFileManager />} />
           <Route path="analytics" element={<DashboardAnalytics />} />
           <Route path="settings" element={<div className="text-center py-20 text-slate-500">بخش تنظیمات در حال توسعه است...</div>} />

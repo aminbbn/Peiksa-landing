@@ -28,7 +28,7 @@ export const DashboardLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans" dir="rtl">
+    <div className="h-screen bg-slate-50 flex font-sans overflow-hidden" dir="rtl">
       {/* Sidebar Overlay for Mobile */}
       {isSidebarOpen && (
         <div 
@@ -41,7 +41,7 @@ export const DashboardLayout: React.FC = () => {
       <aside className={`fixed lg:static inset-y-0 right-0 w-72 bg-white border-l border-slate-200 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
         <div className="h-full flex flex-col">
           {/* Logo */}
-          <div className="h-20 flex items-center px-8 border-b border-slate-100">
+          <div className="h-20 flex items-center px-8 border-b border-slate-100 shrink-0">
             <img 
               src="https://upload-file-droplinked.s3.amazonaws.com/292f7d549e4eccaf99a7c2b79fe1d6d1bf9d6fe4529720730387b84cc62d7af0.png" 
               alt="Peiksa" 
@@ -75,7 +75,7 @@ export const DashboardLayout: React.FC = () => {
           </nav>
 
           {/* User Profile */}
-          <div className="px-4 pt-4 border-t border-slate-100">
+          <div className="px-4 pt-4 border-t border-slate-100 shrink-0">
             <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20">
                 {user.name.charAt(0)}
@@ -88,7 +88,7 @@ export const DashboardLayout: React.FC = () => {
           </div>
 
           {/* Logout Button */}
-          <div className="p-4">
+          <div className="p-4 shrink-0">
             <button 
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 py-3 rounded-xl transition-colors text-sm font-bold"
@@ -101,9 +101,9 @@ export const DashboardLayout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Header */}
-        <header className="h-20 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-30">
+        <header className="h-20 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0 z-30">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsSidebarOpen(true)}
@@ -132,7 +132,7 @@ export const DashboardLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto scroll-smooth">
           <div className="w-full h-full">
             <Outlet />
           </div>
